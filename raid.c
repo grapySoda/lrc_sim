@@ -417,7 +417,7 @@ void make_request(struct mddev *mddev, struct io *io)
         }
         
         for (i = 0; mddev->handle_list[i]; i++) {
-                handle_stripe(mddev->handle_list[i], mddev);
+                // handle_stripe(mddev->handle_list[i], mddev);
         }
         
         print_handle_list(mddev);
