@@ -145,33 +145,34 @@ struct rdev {
 	char 			*disk_type;
 	int			*buf_ptr;
 	unsigned long		nr_buf;
-	// unsigned long		sector;		/* sector of this row */
-	// unsigned long		flags;
-};
-
-struct shdev {
-	struct superblock	*sb;
-	struct buf		*buf;
-
-	int			*buf_ptr;
-	unsigned long		nr_buf;
-	unsigned long		sector;
+	unsigned long		sector;		/* sector of this row */
 	unsigned long		flags;
 };
 
+// struct shdev {
+// 	struct superblock	*sb;
+// 	struct buf		*buf;
+
+// 	int			*buf_ptr;
+// 	unsigned long		nr_buf;
+// 	unsigned long		sector;
+// 	unsigned long		flags;
+// };
+
 struct stripe_head {
-	int 			stripe_number;	/* chunk number */
-	int 			stripe_offset;	/* chunk offset */
+	unsigned long 		stripe_number;	/* chunk number */
+	unsigned long		stripe_offset;	/* chunk offset */
 	
 	short			lpd1_idx;	/* local parity disk1 index */
         short			lpd2_idx;	/* local parity disk2 index */
 	short			gqd1_idx;	/* (global parity disk1)'Q' disk index for raid6 */
         short			gqd2_idx;	/* (global parity disk2)'Q' disk index for raid6 */
 	
+	unsigned long		sector;
 	unsigned long		state;		/* state flags */
 	int			disks;		/* disks in stripe */
 
-	struct shdev 		*dev;		/* allocated with extra space depending of RAID geometry */
+	struct rdev 		*dev;		/* allocated with extra space depending of RAID geometry */
 };
 
 struct mddev {

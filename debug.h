@@ -4,8 +4,8 @@
 #include <stdio.h>
 
 // #define DEBUG
-#define DEBUG_SH
-#define DEBUG_RT
+// #define DEBUG_SH
+// #define DEBUG_RT
 
 #ifdef DEBUG
 #define pr_debug(M, ...) fprintf(stdout, "[log] " M , ##__VA_ARGS__)
