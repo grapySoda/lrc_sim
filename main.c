@@ -20,7 +20,6 @@
 
 void raid_ctr_init(struct mddev *mddev)
 {
-        int i;
         struct disk_info disk_info[] = {
 	        {"cmr",	268435456, 1099511627776, 7200},        /* cmr, 256 MB, 1 TB, 7200 RPM */
 	        {"smr",	268435456, 1099511627776, 5400}         /* smr, 256 MB, 1 TB, 7200 RPM */

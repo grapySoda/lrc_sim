@@ -16,12 +16,12 @@
 #define HANDLE_LIST_SIZE	65536
 #define MAPPING_TABLE_SIZE	65536
 
-#define BUF_READ_TIME		200
+#define BUF_READ_TIME		100
 #define BUF_WRITE_TIME		200
 // #define BUF_WB_TIME		200
 
-#define DISK_READ_TIME		200
-#define DISK_WRITE_TIME		200
+#define DISK_READ_TIME		1000
+#define DISK_WRITE_TIME		2000
 
 #define PREXOR_TIME		200
 #define XOR_TIME		200
@@ -141,9 +141,9 @@ struct buf {
 struct rdev {
 	struct superblock	*sb;
 	struct buf		*buf;
-	
+
 	char 			*disk_type;
-	int			buf_ptr;
+	int			*buf_ptr;
 	unsigned long		nr_buf;
 	// unsigned long		sector;		/* sector of this row */
 	// unsigned long		flags;
@@ -153,7 +153,7 @@ struct shdev {
 	struct superblock	*sb;
 	struct buf		*buf;
 
-	int			buf_ptr;
+	int			*buf_ptr;
 	unsigned long		nr_buf;
 	unsigned long		sector;
 	unsigned long		flags;
