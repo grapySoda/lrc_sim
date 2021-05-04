@@ -67,46 +67,76 @@ void print_handle_list(struct mddev *mddev)
 
 void init_disk(struct mddev *mddev)
 {
-        puts("init_disk");
-        unsigned long i, j;
+        int i;
+        unsigned long j, k;
 
         int data_disks   = mddev->data_disks;
         int raid_disks   = mddev->data_disks + mddev->parity_disks;
         
-        unsigned long nr_data_bitmap      = mddev->data_disk_info->disk_capacity >> 16;
-        unsigned long nr_parity_bitmap    = mddev->parity_disk_info->disk_capacity >> 16;
+        unsigned long nr_data_bitmap    = mddev->data_disk_info->disk_capacity >> 16;
+        unsigned long nr_parity_bitmap  = mddev->parity_disk_info->disk_capacity >> 16;
+        
+        unsigned long nr_data_buf       = mddev->data_disk_info->buffer_size >> PAGE_SHIFT;
+        unsigned long nr_parity_buf     = mddev->parity_disk_info->buffer_size >> PAGE_SHIFT;
 
-        mddev->sb = malloc(sizeof(struct superblock) * raid_disks);
+        mddev->rdev = malloc(sizeof(struct rdev) * raid_disks);
 
+        // mddev->rdev->sb         = malloc(sizeof(struct superblock) * raid_disks);
+        // mddev->rdev->buf        = malloc(sizeof(struct superblock) * raid_disks);
+        
         /* init data_disk's bitmap */
         for (i = 0; i < data_disks; i++) {
-                mddev->sb[i].bitmap = malloc(sizeof(unsigned long) * nr_data_bitmap);
-                
-                if (!mddev->sb[i].bitmap) {
-                        puts("Allocat failed!, break");
-                        break;
-                } else puts("Success");
+                mddev->rdev[i].buf_ptr = 0;
+                mddev->rdev[i].nr_buf = nr_data_buf;
+                pr_debug("dev->nr_buf: %lu\n", mddev->rdev[i].nr_buf);
+
+                mddev->rdev[i].sb = malloc(sizeof(struct superblock));
+                mddev->rdev[i].sb->bitmap  = malloc(sizeof(unsigned long) * nr_data_bitmap);
+                if (mddev->rdev[i].sb->bitmap)
+                        pr_debug("dev[%d] bitmap allocate success.\n", i);
+                else 
+                        pr_debug("dev[%d] bitmap allocate failed.\n", i);
 
                 for (j = 0; j < nr_data_bitmap; j++)
-                        mddev->sb[i].bitmap[j] = 21;
+                        mddev->rdev[i].sb->bitmap[j] = 0;
+
+                mddev->rdev[i].buf = malloc(sizeof(struct buf) * nr_data_buf);
+                if (mddev->rdev[i].buf)
+                        pr_debug("dev[%d] buffer allocate success.\n", i);
+                else
+                        pr_debug("dev[%d] buffer allocate failed.\n", i);
+
+                for (j = 0; j < nr_data_buf; j++) {
+                        mddev->rdev[i].buf[j].number = 0;
+                        mddev->rdev[i].buf[j].offset = 0;
+                }
         }
 
         /* init parity_disk's bitmap */
-        printf("data_disks: %d, raid_disks: %d\n", data_disks, raid_disks);
         for (i = data_disks; i < raid_disks; i++) {
-                mddev->sb[i].bitmap = malloc(sizeof(unsigned long) * nr_parity_bitmap);
-                
-                if (!mddev->sb[i].bitmap) {
-                        puts("Allocate failed!, break");
-                        break;
-                } else puts("Success");
+                mddev->rdev[i].buf_ptr = 0;
+                mddev->rdev[i].nr_buf = nr_parity_buf;
+
+                mddev->rdev[i].sb = malloc(sizeof(struct superblock));
+                mddev->rdev[i].sb->bitmap = malloc(sizeof(unsigned long) * nr_parity_bitmap);
+                if (mddev->rdev[i].sb->bitmap) pr_debug("dev[%d] bitmap allocate success.\n", i);
+                else pr_debug("dev[%d] bitmap allocate failed.\n", i);
 
                 for (j = 0; j < nr_parity_bitmap; j++)
-                        mddev->sb[i].bitmap[j] = 22;
+                        mddev->rdev[i].sb->bitmap[j] = 0;
+
+                mddev->rdev[i].buf = malloc(sizeof(struct buf) * nr_parity_buf);
+                if (mddev->rdev[i].buf) pr_debug("dev[%d] buffer allocate success.\n", i);
+                else pr_debug("dev[%d] buffer allocate failed.\n", i);
+
+                for (j = 0; j < nr_parity_buf; j++) {
+                        mddev->rdev[i].buf[j].number = 0;
+                        mddev->rdev[i].buf[j].offset = 0;
+                }
         }
-        
-        printf("size of data_disk's bitmap: %lu\n", mddev->sb[0].bitmap[nr_data_bitmap-1]);
-        printf("size of parity_disk's bitmap: %lu\n", mddev->sb[3].bitmap[nr_parity_bitmap-1]);
+
+        // printf("size of data_disk's bitmap: %lu\n", mddev->sb[0].bitmap[nr_data_bitmap-1]);
+        // printf("size of parity_disk's bitmap: %lu\n", mddev->sb[3].bitmap[nr_parity_bitmap-1]);
 }
 
 void init_handle_list(struct mddev *mddev)
@@ -116,19 +146,26 @@ void init_handle_list(struct mddev *mddev)
                 mddev->handle_list[i] = NULL;
 }
 
-struct stripe_head* init_stripe_head(int raid_disks)
+struct stripe_head* init_stripe_head(struct mddev *mddev)
 {
         int i;
+        int raid_disks = mddev->data_disks + mddev->parity_disks;
+
         struct stripe_head *sh;
 
         sh      = malloc(sizeof(struct stripe_head));
-        sh->dev = malloc(sizeof(struct rdev) * raid_disks); 
-        
+        sh->dev = malloc(sizeof(struct shdev) * raid_disks);
+
         for (i = 0; i < raid_disks; i++) {
                 sh->dev[i].sector = 0;
                 sh->dev[i].flags = 0;
+                
+                sh->dev[i].sb           = mddev->rdev[i].sb;
+                sh->dev[i].buf          = mddev->rdev[i].buf;
+                sh->dev[i].buf_ptr      = mddev->rdev[i].buf_ptr;
+                sh->dev[i].nr_buf       = mddev->rdev[i].nr_buf;
         }
-
+        pr_debug("sh\n");
         return sh;
 }
 // void raid_run_ops(struct stripe_head *sh)
@@ -140,9 +177,9 @@ struct stripe_head* init_stripe_head(int raid_disks)
 // {
 //         ;
 // }
-int buffer_write(struct rdev *dev, unsigned long bm_number, unsigned long bm_offset)
+int buffer_write(struct shdev *dev, unsigned long bm_number, unsigned long bm_offset)
 {
-        int *ptr = &dev->buf->ptr;
+        int *ptr = &dev->buf_ptr;
 
         dev->buf[*ptr].number = bm_number;
         dev->buf[*ptr].offset = bm_offset;
@@ -151,26 +188,29 @@ int buffer_write(struct rdev *dev, unsigned long bm_number, unsigned long bm_off
         return BUF_WRITE_TIME;
 }
 
-int write_back(struct rdev *dev)
+int write_back(struct shdev *dev)
 {
-        dev->buf->ptr = 0;
+        dev->buf_ptr = 0;
 
         return DISK_WRITE_TIME * BUF_SIZE;
 }
 
-int generic_make_request(struct rdev *dev, int rw)
+int generic_make_request(struct shdev *dev, int rw)
 {
         int i;
         int buf_time = 0;
-        int *ptr = &dev->buf->ptr;
+        int *ptr = &dev->buf_ptr;
 
         unsigned long pg_number = dev->sector / STRIPE_SECTORS;
 
         unsigned long bm_number = pg_number / sizeof(unsigned long);
         unsigned long bm_offset = pg_number % sizeof(unsigned long);
+        pr_debug("init done\n");
 
         /* search buffer */
-        for (i = 0; i < BUF_SIZE; i++) {
+        for (i = 0; i < dev->nr_buf; i++) {
+                if (dev->buf)
+                        puts("OK");
                 if (dev->buf[i].number == bm_number &&
                     dev->buf[i].offset == bm_offset) {
                         if (rw == IO_READ)
@@ -179,13 +219,23 @@ int generic_make_request(struct rdev *dev, int rw)
                                 return BUF_WRITE_TIME;
                 }
         }
+        pr_debug("one for\n");
 
         /* search disk */
-        if ((*ptr) < BUF_SIZE)
+        if (ptr)
+                pr_debug("ptr: %d, dev->nr_buf: %lu\n ", *ptr, dev->nr_buf);
+        else
+                puts("111");
+        if ((*ptr) < dev->nr_buf) {
+                pr_debug("000\n");
                 buf_time += buffer_write(dev, bm_number, bm_offset);
+                pr_debug("111\n");
+        }
+                
         else
                 buf_time += buffer_write(dev, bm_number, bm_offset) + write_back(dev);
         
+        pr_debug("two for\n");
         if (!test_bit(bm_offset, &dev->sb->bitmap[bm_number]))
                 set_bit(bm_offset, &dev->sb->bitmap[bm_number]);
 
@@ -195,17 +245,19 @@ int generic_make_request(struct rdev *dev, int rw)
 void ops_run_io(struct stripe_head *sh, int disks, int rw)
 {
         int i;
-        struct rdev *dev;
+        struct shdev *dev;
 
         for (i = disks; i--; ) {
                 dev = &sh->dev[i];
                 if (test_bit(R_Wantread, &dev->flags) && rw == IO_READ) {
                         clear_bit(R_Wantread, &dev->flags);
+                        pr_debug("generic_make_request(R)\n");
                         generic_make_request(dev, rw);
                 }
                 
                 if (test_bit(R_Wantwrite, &dev->flags) && rw == IO_WRITE) {
                         clear_bit(R_Wantwrite, &dev->flags);
+                        pr_debug("generic_make_request(W)\n");
                         generic_make_request(dev, rw);
                 }           
         }
@@ -224,8 +276,8 @@ struct stripe_head* get_active_stripe(struct mddev *mddev,
 
         /* If do not have any stripe head in handle list */
         if (!handle_list[0]) {
-                printf("Did not have any sh in handle list, create one.\n");
-                sh = init_stripe_head(mddev->data_disks + mddev->parity_disks);
+                // pr_debug("Did not have any sh in handle list, create one.\n");
+                sh = init_stripe_head(mddev);
                 sh->stripe_number = stripe_number;
                 sh->stripe_offset = stripe_offset;
 
@@ -238,7 +290,7 @@ struct stripe_head* get_active_stripe(struct mddev *mddev,
         for (i = 0; handle_list[i]; i++) {
                 if (handle_list[i]->stripe_number == stripe_number &&
                     handle_list[i]->stripe_offset == stripe_offset) {
-                        printf("Find match one, return.\n");
+                        // pr_debug("Find match one, return.\n");
                         sh = handle_list[i];
 
                         return sh;
@@ -248,9 +300,9 @@ struct stripe_head* get_active_stripe(struct mddev *mddev,
         }
 
         /* Did not find the match stripe head, create one */
-        printf("Did not find any match , create one. stripe_number: %lu, stripe_offeset: %lu\n", 
-               stripe_number, stripe_offset);
-        sh = init_stripe_head(mddev->data_disks + mddev->parity_disks);
+        // pr_debug("Did not find any match , create one. stripe_number: %lu, stripe_offeset: %lu\n", 
+        //        stripe_number, stripe_offset);
+        sh = init_stripe_head(mddev);
         sh->stripe_number = stripe_number;
         sh->stripe_offset = stripe_offset;
 
@@ -264,7 +316,7 @@ int handle_stripe_dirtying(struct stripe_head *sh, int level, int disks)
         int i;
         int rcw = 0;
         int rmw = 0;
-        struct rdev *dev;
+        struct shdev *dev;
 
         if (level <= 5) {
                 for (i = disks; i--; ) {
@@ -304,6 +356,7 @@ void handle_stripe(struct stripe_head *sh, struct mddev *mddev)
 {
         int rcw;
         rcw = handle_stripe_dirtying(sh, mddev->level, mddev->data_disks + mddev->parity_disks);
+        // pr_debug("ops_run_io\n");
         // ops_run_io(sh, mddev->data_disks + mddev->parity_disks, IO_READ);
         // schedule_reconstruction(sh, rcw);
         // raid_run_ops(sh);
@@ -377,7 +430,7 @@ void print_sh(struct stripe_head *sh, struct mddev *mddev)
 void make_request(struct mddev *mddev, struct io *io)
 {
         int i, dd_idx;
-
+        
         unsigned long stripe_number;
         unsigned long stripe_offset;
 
@@ -386,14 +439,13 @@ void make_request(struct mddev *mddev, struct io *io)
         unsigned long new_sector = 0;
 
         struct stripe_head *sh;
-
+        
         init_handle_list(mddev);
-
+        
         for (; logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
                 new_sector = raid_compute_sector(mddev, logical_sector, &dd_idx, NULL,
                                                  &stripe_number, &stripe_offset);
 
-                // sleep(5000);
                 sh = get_active_stripe(mddev, stripe_number, stripe_offset);
 
                 pr_debug("raid456: make_request, sector %llu logical %llu dd_idx %d pd_idx %d " 
@@ -404,22 +456,24 @@ void make_request(struct mddev *mddev, struct io *io)
 
                 sh->dev[dd_idx].sector = new_sector;
                 set_bit(R_Wantwrite, &sh->dev[dd_idx].flags);
-                
+                // pr_debug("raid_compute_sector\n");
                 raid_compute_sector(mddev, logical_sector, &dd_idx, sh,
                                     &stripe_number, &stripe_offset);
 
-                pr_debug("stripe, stripe_number %d, stripe_offset %d\n",
-                         sh->stripe_number, sh->stripe_offset);
+                // pr_debug("stripe, stripe_number %d, stripe_offset %d\n",
+                //          sh->stripe_number, sh->stripe_offset);
 
-                if (mddev->level > 5) {
+                if (mddev->level > 5)
                         set_bit(R_Wantwrite, &sh->dev[sh->gqd1_idx].flags);
-                }
         }
         
         for (i = 0; mddev->handle_list[i]; i++) {
-                // handle_stripe(mddev->handle_list[i], mddev);
+                handle_stripe(mddev->handle_list[i], mddev);
         }
-        
+        printf("struct stripe_head: %lu\n", sizeof(struct stripe_head));
+        printf("struct shdev: %lu\n", sizeof(struct shdev));
         print_handle_list(mddev);
+        // sleep(5);
         free_handle_list(mddev);
+        // sleep(15);
 }

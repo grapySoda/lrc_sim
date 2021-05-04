@@ -6,6 +6,8 @@
 #define DATA_CMR_PARITY_SMR	2	/* All of data disks used CMR tech, parity disks used SMR tech */
 #define DATA_SMR_PARITY_CMR	3	/* All of data disks used SMR tech, parity disks used CMR tech */
 
+#define PAGE_SHIFT		12
+
 #define SECTOR_SIZE		512
 #define STRIPE_SECTORS		8
 
@@ -28,6 +30,28 @@
 #define DISK_HIT		100
 #define BUF_SIZE		256
 
+// typedef int (*smr_translate_fn) (struct dm_target *target,
+// 			  unsigned int argc, char **argv);
+// typedef int (*smr_reportzone_fn) (struct dm_target *target,
+// 			  unsigned int argc, char **argv);
+// typedef int (*smr_reset_wp_fn) (struct dm_target *target,
+// 			  unsigned int argc, char **argv);
+// typedef int (*smr_finish_fn) (struct dm_target *target,
+// 			  unsigned int argc, char **argv);
+
+// struct smr {
+// 	unsigned long		*ps_table;	/* persistent cache */
+	
+// 	struct stl {
+// 		unsigned long	pba;
+// 		unsigned long	lba;
+// 	} *stl_table;
+
+// 	smr_translate_fn	translate;
+// 	smr_reportzone_fn	report_zone;
+// 	smr_reset_wp_fn		reset_sp;
+// 	smr_finish_fn		finish_zone;
+// };
 
 # define sector_div(n, b)( \
 { \
@@ -109,22 +133,33 @@ struct superblock {
 	} mapping_table[MAPPING_TABLE_SIZE];
 };
 
+struct buf {
+	int 			number;
+	int			offset;
+};
+
 struct rdev {
 	struct superblock	*sb;
+	struct buf		*buf;
+	
 	char 			*disk_type;
+	int			buf_ptr;
+	unsigned long		nr_buf;
+	// unsigned long		sector;		/* sector of this row */
+	// unsigned long		flags;
+};
 
-	struct buf {
-		int 		number;
-		int		offset;
-		int		ptr;
-	}*buf;
+struct shdev {
+	struct superblock	*sb;
+	struct buf		*buf;
 
-	unsigned long		sector;		/* sector of this row */
+	int			buf_ptr;
+	unsigned long		nr_buf;
+	unsigned long		sector;
 	unsigned long		flags;
 };
 
 struct stripe_head {
-	int 		        sector;		/* sector of this row */
 	int 			stripe_number;	/* chunk number */
 	int 			stripe_offset;	/* chunk offset */
 	
@@ -136,7 +171,7 @@ struct stripe_head {
 	unsigned long		state;		/* state flags */
 	int			disks;		/* disks in stripe */
 
-	struct rdev	 	*dev;		/* allocated with extra space depending of RAID geometry */
+	struct shdev 		*dev;		/* allocated with extra space depending of RAID geometry */
 };
 
 struct mddev {
@@ -144,7 +179,6 @@ struct mddev {
 	// struct disk_info 	smr;
 
 	struct stripe_head	*handle_list[HANDLE_LIST_SIZE];
-	struct superblock	*sb;
 
 	struct disk_info	*data_disk_info;
 	struct disk_info	*parity_disk_info;
@@ -157,6 +191,8 @@ struct mddev {
 	int 			chunk_sectors;
 
 	unsigned long		flags;
+
+	struct rdev		*rdev;
 };
 
 struct io {
