@@ -16,12 +16,13 @@
 #define HANDLE_LIST_SIZE	65536
 #define MAPPING_TABLE_SIZE	65536
 
-#define BUF_READ_TIME		100
-#define BUF_WRITE_TIME		200
+/* delay time is based on microsecond */
+#define BUF_READ_TIME		1
+#define BUF_WRITE_TIME		1
 // #define BUF_WB_TIME		200
 
-#define DISK_READ_TIME		1000
-#define DISK_WRITE_TIME		2000
+#define DISK_READ_TIME		6344
+#define DISK_WRITE_TIME		7979
 
 #define PREXOR_TIME		200
 #define XOR_TIME		200
@@ -39,12 +40,23 @@
 // typedef int (*smr_finish_fn) (struct dm_target *target,
 // 			  unsigned int argc, char **argv);
 
-// struct smr {
-// 	unsigned long		*ps_table;	/* persistent cache */
+// struct zone {
+// 	unsigned long 		*bitmap;
+// 	unsigned long		w_ptr;
+
+// 	struct mapping_table {
+// 		int 		page_number;
+// 		unsigned long	*addr;
+// 	} mapping_table[MAPPING_TABLE_SIZE];
+// };
+
+// struct dm_smr {
+// 	struct zone		*zone;
+// 	unsigned long		*ps_bitmap;	/* persistent cache's bitmap */
 	
 // 	struct stl {
-// 		unsigned long	pba;
-// 		unsigned long	lba;
+// 		unsigned long	*pba;
+// 		unsigned long	*lba;
 // 	} *stl_table;
 
 // 	smr_translate_fn	translate;

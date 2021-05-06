@@ -8,7 +8,7 @@
 
 #define DISKS_INFO      "disks.info"
 #define RAID_CONFIG     "raid.config"
-#define TRACE_FILE      "randwrite.trace"
+#define TRACE_FILE      "/home/ccs/project_lrc_sim/randwrite.trace"
 
 // raid_types[] = {
 // 	{"raid10",   "RAID10 (striped mirrors)",        0, 2, 2, ALL_CMR},

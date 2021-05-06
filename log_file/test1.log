@@ -1,12 +1,14 @@
 
-[Request 0]resp_time: 70758400
+[Request 0] Logical Offset: 2148007936, Write Size: 268435456, Response Time: 70758400
 
-[Request 1]resp_time: 70424000
+[Request 1] Logical Offset: 990068736, Write Size: 268435456, Response Time: 70424000
 
-[Request 2]resp_time: 70707200
+[Request 2] Logical Offset: 252030976, Write Size: 268435456, Response Time: 70707200
 
-[Request 3]resp_time: 4400
+[Request 3] Logical Offset: 609918976, Write Size: 4096, Response Time: 4400
 
-[Request 4]resp_time: 4400
+[Request 4] Logical Offset: 609918976, Write Size: 4096, Response Time: 300
 
-[Request 5]resp_time: 300
+[Request 5] Logical Offset: 697901056, Write Size: 4096, Response Time: 4400
+
+[Request 6] Logical Offset: 990068736, Write Size: 4096, Response Time: 2400

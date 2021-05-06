@@ -244,7 +244,7 @@ unsigned long generic_make_request(struct rdev *dev, int rw)
         pr_debug("bm_offset: %lu\n", bm_offset);
 
         /* search buffer */
-        for (i = 0; i < dev->nr_buf; i++) {
+        for (i = 0; i < (*ptr); i++) {
                 if (dev->buf[i].number == bm_number &&
                     dev->buf[i].offset == bm_offset) {
                         if (rw == IO_READ) {
@@ -542,7 +542,8 @@ void make_request(struct mddev *mddev, struct io *io)
         for (i = 0; mddev->handle_list[i]; i++)
                 resp_time += handle_stripe(mddev->handle_list[i], mddev, &stripe_num);
 
-        printf("\n[Request %lu] Response Time: %lu\n", requst_tims++, resp_time);
+        printf("\n[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n",
+                requst_tims++, io->logical_sector, io->length, resp_time);
 
         // print_handle_list(mddev);
         // sleep(5);
