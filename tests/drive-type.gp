@@ -6,11 +6,12 @@ set output 'drive-type.eps'
 set ylabel 'Latency (ms)'
 set xlabel 'Operation Number'
 
-set xrange [0:256]
-# set yrange [0:320]
+# set xrange [0:1000]
+set yrange [0:150]
 # set ytics 150
 
 set border 3 back
 set tics nomirror out scale 0.75
 
 p "rand-write_lat.1.log" u 0:($2/1000000) notitle w l
+# p "sim-rand-write_lat.1.log" u 0:($2/1000000) notitle w l

@@ -14,7 +14,7 @@
 #endif
 
 #ifdef DEBUG_SH
-#define pr_debug_sh(M, ...) fprintf(stdout, "[log] " M , ##__VA_ARGS__)
+#define pr_debug_sh(M, ...) fprintf(stdout, M , ##__VA_ARGS__)
 #else
 #define pr_debug_sh(M, ...)
 #endif

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "raid.h"
 #include "bitops.h"
@@ -111,8 +112,8 @@ void init_disk(struct mddev *mddev)
                 mddev->rdev[i].nr_buf = nr_data_buf;
                 mddev->rdev[i].flags = 0;
 
-                mddev->rdev[i].buf_ptr = malloc(sizeof(int));
-                *(mddev->rdev[i].buf_ptr) = 0;
+                mddev->rdev[i].buf_write_ptr = 0;
+                mddev->rdev[i].buf_usage = nr_data_buf;
 
                 mddev->rdev[i].sb = malloc(sizeof(struct superblock));
 
@@ -144,8 +145,8 @@ void init_disk(struct mddev *mddev)
                 mddev->rdev[i].flags = 0;
                 mddev->rdev[i].nr_buf = nr_parity_buf;
 
-                mddev->rdev[i].buf_ptr = malloc(sizeof(int));
-                *(mddev->rdev[i].buf_ptr) = 0;
+                mddev->rdev[i].buf_write_ptr = 0;
+                mddev->rdev[i].buf_usage = nr_parity_buf;
 
                 mddev->rdev[i].sb = malloc(sizeof(struct superblock));
 
@@ -209,29 +210,74 @@ struct stripe_head* init_stripe_head(struct mddev *mddev)
 // {
 //         ;
 // }
+
+// if ((*ptr) < (dev->nr_buf * BUF_FLUSH_THRESHOLD)) {
+//         buf_time = buffer_write(dev, bm_number, bm_offset);
+//         pr_debug_rt("buffer write time: %d\n", buf_time);
+// } else {
+//         buf_time = buffer_write(dev, bm_number, bm_offset) + write_back(dev);
+//         pr_debug_rt("buffer write time: %d (write back)\n", buf_time);
+// }
+
+// int rotate_disk(struct rdev *dev)
+// {
+//         ;
+// }
+
+int buffer_flush(struct rdev *dev)
+{
+        // unsigned int bwt = dev->buf_write_ptr;  /* buf write ptr */
+
+        static int wb_times;                    /* write buf times */
+        static int bfr;                         /* buffer flush ratio */
+
+        bfr = (bfr == 0) ? BUF_FLUSH_RATIO + rand() % BUF_FLUSH_DEVIATION
+                         : bfr;
+                         
+        if (dev->buf_usage > (dev->nr_buf * (1 - BUF_FLUSH_THRESHOLD))) {
+                if (wb_times++ < BUF_FLUSH_RATIO) {
+                        return 0;
+                } else {
+                        wb_times = 0;
+                        bfr = BUF_FLUSH_RATIO + rand() % BUF_FLUSH_DEVIATION;
+
+                        return 1000000;         /* (under construction!!) small flush */
+                        // return rotate_disk(dev);
+                }
+        } else {
+                return 20000000;                /* (under construction!!) big flush */
+        }
+}
+
 int buffer_write(struct rdev *dev, unsigned long bm_number, unsigned long bm_offset)
 {
-        int *ptr = dev->buf_ptr;
-        pr_debug("buffer_write, ptr = %d\n", (*ptr));
-        dev->buf[*ptr].number = bm_number;
-        dev->buf[*ptr].offset = bm_offset;
-        (*ptr)++;
+        unsigned int *ptr = &(dev->buf_write_ptr);
+        int buf_time = 0;
 
-        return BUF_WRITE_TIME;
+        buf_time += buffer_flush(dev);
+        pr_debug("buffer_write, ptr = %d\n", (*ptr));
+
+        dev->buf[*ptr].number = bm_number;
+        dev->buf[*ptr].offset = bm_offset; 
+        (*ptr)++;
+        dev->buf_usage--;
+
+        return buf_time + BUF_WRITE_TIME + rand() % BUF_DEVIATION;
 }
 
 int write_back(struct rdev *dev)
 {
-        *(dev->buf_ptr) = 0;
+        dev->buf_write_ptr = 0;
         pr_debug("\n\n\n\n\n\n\n\n\nbuf full!!!!\n\n\n\n\n\n\n\n\n");
-        return DISK_WRITE_TIME * BUF_SIZE;
+        
+        return DISK_WRITE_TIME * BUF_SIZE + rand() % BUF_DEVIATION;
 }
 
 unsigned long generic_make_request(struct rdev *dev, int rw)
 {
         int i;
-        int buf_time = 0;
-        int *ptr = dev->buf_ptr;
+        int buf_time;
+        unsigned int *ptr = &(dev->buf_write_ptr);
 
         unsigned long pg_number = dev->sector / STRIPE_SECTORS;
 
@@ -248,33 +294,37 @@ unsigned long generic_make_request(struct rdev *dev, int rw)
                 if (dev->buf[i].number == bm_number &&
                     dev->buf[i].offset == bm_offset) {
                         if (rw == IO_READ) {
-                                pr_debug_rt("buffer read hit time: %lu\n", BUF_READ_TIME);
-                                return BUF_READ_TIME;
+                                buf_time = BUF_READ_TIME + rand() % BUF_DEVIATION;
+                                pr_debug_rt("buffer read hit time: %u\n", buf_time);
+                                return buf_time;
                         } else {
-                                pr_debug_rt("buffer write hit time: %lu\n", BUF_WRITE_TIME);
-                                return BUF_WRITE_TIME;
+                                buf_time = BUF_WRITE_TIME + rand() % BUF_DEVIATION;
+                                pr_debug_rt("buffer write hit time: %u\n", buf_time);
+                                return buf_time;
                         }
                 }
         }
         pr_debug("buffer miss\n");
 
-        /* search disk */
-        if ((*ptr) < dev->nr_buf) {
-                buf_time += buffer_write(dev, bm_number, bm_offset);   
-                pr_debug_rt("buffer write time: %d\n", buf_time);
-        } else {
-                buf_time += buffer_write(dev, bm_number, bm_offset) + write_back(dev);
-                pr_debug_rt("buffer write time: %d (write back)\n", buf_time);
-        }
+        /* write to buf or flush the buf before write to buf */
+        buf_time = buffer_write(dev, bm_number, bm_offset);
+        // if ((*ptr) < (dev->nr_buf * BUF_FLUSH_RATIO)) {
+        //         buf_time = buffer_write(dev, bm_number, bm_offset);
+        //         pr_debug_rt("buffer write time: %d\n", buf_time);
+        // } else {
+        //         buf_time = buffer_write(dev, bm_number, bm_offset) + write_back(dev);
+        //         pr_debug_rt("buffer write time: %d (write back)\n", buf_time);
+        // }
         
+        return buf_time;
 
-        if (!test_bit(bm_offset, &dev->sb->bitmap[bm_number]) && rw != IO_READ) {
-                pr_debug("disk miss\n");
-                set_bit(bm_offset, &dev->sb->bitmap[bm_number]);
-                buf_time += DISK_WRITE_TIME;
-        } else pr_debug("disk hit\n");
+        // if (!test_bit(bm_offset, &dev->sb->bitmap[bm_number]) && rw != IO_READ) {
+        //         pr_debug("disk miss\n");
+        //         set_bit(bm_offset, &dev->sb->bitmap[bm_number]);
+        //         buf_time += DISK_WRITE_TIME;
+        // } else pr_debug("disk hit\n");
 
-        return DISK_READ_TIME + buf_time;
+        // return DISK_READ_TIME + buf_time;
 }
 
 unsigned long ops_run_io(struct stripe_head *sh, int disks, int rw)
@@ -485,11 +535,10 @@ unsigned long raid_compute_sector(struct mddev *mddev, unsigned long r_sector,
 //                 printf("sh->dev[%d] = %lu\n", i, sh->dev[i].sector);
 // }
 
-void make_request(struct mddev *mddev, struct io *io)
+unsigned long make_request(struct mddev *mddev, struct io *io)
 {       
-        static unsigned long requst_tims;
-
         int i, dd_idx;
+        static unsigned long requst_times;
         
         unsigned long resp_time = 0;
 
@@ -503,9 +552,9 @@ void make_request(struct mddev *mddev, struct io *io)
         struct stripe_head *sh;
         
         init_handle_list(mddev);
-        
-        for (i = 0; i < mddev->parity_disks + mddev->data_disks; i++)
-                pr_debug_sh("disk[%d]: %d\n", i, *(mddev->rdev[i].buf_ptr));
+        srand(time(NULL));
+        // for (i = 0; i < mddev->parity_disks + mddev->data_disks; i++)
+        //         pr_debug_sh("disk[%d]: %d\n", i, *(mddev->rdev[i].buf_ptr));
 
         for (; logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
                 new_sector = raid_compute_sector(mddev, logical_sector, &dd_idx, NULL,
@@ -543,10 +592,40 @@ void make_request(struct mddev *mddev, struct io *io)
                 resp_time += handle_stripe(mddev->handle_list[i], mddev, &stripe_num);
 
         printf("\n[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n",
-                requst_tims++, io->logical_sector, io->length, resp_time);
+                requst_times++, io->logical_sector, io->length, resp_time);
 
         // print_handle_list(mddev);
         // sleep(5);
         free_handle_list(mddev);
         // sleep(15);
+        return resp_time;
+}
+
+unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw)
+{       
+        int i;
+        static unsigned long requst_times;
+        
+        struct rdev *dev = &mddev->rdev[0];
+
+        unsigned long resp_time;
+
+        unsigned long logical_sector = io->logical_sector / SECTOR_SIZE;
+        unsigned long last_sector = logical_sector + io->length /SECTOR_SIZE;
+        
+        // for (i = 0; i < mddev->parity_disks + mddev->data_disks; i++)
+        //         pr_debug_sh("disk[%d]: %d\n", i, *(mddev->rdev[i].buf_ptr));
+
+        for (; logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
+                dev->sector = logical_sector;
+                resp_time = generic_make_request(dev, rw);
+        }
+
+        printf("\n[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n",
+                requst_times++, io->logical_sector, io->length, resp_time);
+
+        // print_handle_list(mddev);
+        // sleep(5);
+        // sleep(15);
+        return resp_time;
 }

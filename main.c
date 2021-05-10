@@ -6,9 +6,11 @@
 
 // #define BUF_SIZE        100
 
-#define DISKS_INFO      "disks.info"
-#define RAID_CONFIG     "raid.config"
-#define TRACE_FILE      "/home/ccs/project_lrc_sim/randwrite.trace"
+#define DISKS_INFO              "disks.info"
+#define RAID_CONFIG             "raid.config"
+#define TRACE_FILE              "/home/ccs/project_lrc_sim/tests/rand-write_lat.1.log"
+#define OUTPUT_LAT_LOG          "/home/ccs/project_lrc_sim/tests/sim-rand-write_lat.1.log"
+// #define TRACE_FILE      "randwrite.trace"
 
 // raid_types[] = {
 // 	{"raid10",   "RAID10 (striped mirrors)",        0, 2, 2, ALL_CMR},
@@ -73,23 +75,43 @@ void raid_ctr_init(struct mddev *mddev)
 
 int main(void)
 {
+        unsigned int i = 1;
         struct mddev *mddev = malloc(sizeof(struct mddev));
         struct io *io = malloc(sizeof(struct io));
 
-        // unsigned long a = 1099511627776;
+        unsigned long resp_time;
 
         FILE *fp_trace = NULL;
+        FILE *fp_output_log = NULL;
+
         fp_trace = fopen(TRACE_FILE, "r");
+        fp_output_log = fopen(OUTPUT_LAT_LOG, "w");
 
         raid_ctr_init(mddev);
 
-        fscanf(fp_trace, "%lu %lu", &io->logical_sector, &io->length);
+        fscanf(fp_trace, "%u, %u, %u, %lu, %lu",
+               &io->time, &io->lat, &io->times, &io->length, &io->logical_sector);
+
+        printf("logical_sector: %lu, io->length: %lu\n", io->logical_sector, io->length);
         while (io) {
-                make_request(mddev, io);
-                if (fscanf(fp_trace, "%lu %lu", &io->logical_sector, &io->length) == EOF)
+                // resp_time = make_request(mddev, io);
+                // resp_time = test_single_disk(mddev, io, IO_WRITE);
+
+                // if (io->lat > 600579)
+                if (io->lat > 600000)
+                        printf("[request %u] lat: %u\n", i, io->lat);
+
+                fprintf(fp_output_log, "%u, %lu, %u, %lu, %lu\n",
+                        io->time, resp_time, io->times, io->length, io->logical_sector);
+
+                if (fscanf(fp_trace, "%u, %u, %u, %lu, %lu",
+                           &io->time, &io->lat, &io->times, &io->length, &io->logical_sector) == EOF)
                         io = NULL;
+
+                i++;
         }
         fclose(fp_trace);
+        fclose(fp_output_log);
         free(io);
         return 0;
 }

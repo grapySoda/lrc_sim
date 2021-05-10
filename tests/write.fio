@@ -1,8 +1,8 @@
 [global]
-filename=/dev/sdb
+filename=/dev/sdc
 rw=randwrite
 bs=4k
-size=1m
+size=100M
 direct=1
 ioengine=sync
 log_offset=1

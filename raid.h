@@ -16,20 +16,25 @@
 #define HANDLE_LIST_SIZE	65536
 #define MAPPING_TABLE_SIZE	65536
 
-/* delay time is based on microsecond */
-#define BUF_READ_TIME		1
-#define BUF_WRITE_TIME		1
+/* delay time is based on micro-second */
+#define BUF_READ_TIME		42000
+#define BUF_WRITE_TIME		42000
+
+#define BUF_DEVIATION		3000		/* 3 microsecond deviation */
+#define BUF_FLUSH_DEVIATION	100		/* 100 requests deviation */
+#define BUF_FLUSH_THRESHOLD	0.9
+#define BUF_FLUSH_RATIO		450		/* flush once per 500 write requests */
 // #define BUF_WB_TIME		200
 
-#define DISK_READ_TIME		6344
-#define DISK_WRITE_TIME		7979
+#define DISK_READ_TIME		6344000
+#define DISK_WRITE_TIME		7979000
 
 #define PREXOR_TIME		200
 #define XOR_TIME		200
 #define GEN_SYNDROME_TIME	200
 
 #define DISK_HIT		100
-#define BUF_SIZE		256
+#define BUF_SIZE		256		/* MG */
 
 // typedef int (*smr_translate_fn) (struct dm_target *target,
 // 			  unsigned int argc, char **argv);
@@ -155,7 +160,11 @@ struct rdev {
 	struct buf		*buf;
 
 	char 			*disk_type;
-	int			*buf_ptr;
+	unsigned int		disk_head;
+	unsigned int		buf_write_ptr;
+	unsigned int 		buf_clean_ptr;
+
+	unsigned long		buf_usage;
 	unsigned long		nr_buf;
 	unsigned long		sector;		/* sector of this row */
 	unsigned long		flags;
@@ -209,11 +218,15 @@ struct mddev {
 };
 
 struct io {
+	unsigned int		time;
+	unsigned int		times;
+	unsigned int		lat;
         unsigned long   	logical_sector;
         unsigned long   	length;
 };
 
-void make_request(struct mddev *mddev, struct io *io);
+unsigned long make_request(struct mddev *mddev, struct io *io);
+unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw);
 
 void init_handle_list(struct mddev *mddev);
 void init_disk(struct mddev *mddev);
