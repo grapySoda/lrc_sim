@@ -99,11 +99,17 @@ void init_disk(struct mddev *mddev)
         int data_disks   = mddev->data_disks;
         int raid_disks   = mddev->data_disks + mddev->parity_disks;
         
-        unsigned long nr_data_bitmap    = mddev->data_disk_info->disk_capacity >> 16;
-        unsigned long nr_parity_bitmap  = mddev->parity_disk_info->disk_capacity >> 16;
+        unsigned int nr_data_cylinders   = mddev->data_disk_info->nr_cylinders;
+        unsigned int nr_parity_cylinders = mddev->parity_disk_info->nr_cylinders;
+
+        unsigned int nr_data_sectors     = mddev->data_disk_info->nr_sectors;
+        unsigned int nr_parity_sectors   = mddev->parity_disk_info->nr_sectors;
+
+        unsigned long nr_data_bitmap     = mddev->data_disk_info->disk_capacity >> 16;
+        unsigned long nr_parity_bitmap   = mddev->parity_disk_info->disk_capacity >> 16;
         
-        unsigned long nr_data_buf       = mddev->data_disk_info->buffer_size >> PAGE_SHIFT;
-        unsigned long nr_parity_buf     = mddev->parity_disk_info->buffer_size >> PAGE_SHIFT;
+        unsigned long nr_data_buf        = mddev->data_disk_info->buffer_size >> PAGE_SHIFT;
+        unsigned long nr_parity_buf      = mddev->parity_disk_info->buffer_size >> PAGE_SHIFT;
 
         mddev->rdev = malloc(sizeof(struct rdev) * raid_disks);
         
@@ -114,6 +120,14 @@ void init_disk(struct mddev *mddev)
 
                 mddev->rdev[i].buf_write_ptr = 0;
                 mddev->rdev[i].buf_usage = nr_data_buf;
+
+                mddev->rdev[i].disk_head.sector = 0;
+                mddev->rdev[i].disk_head.cylinder = 0;
+
+                mddev->rdev[i].nr_cylinders = nr_data_cylinders;
+                mddev->rdev[i].nr_sectors   = nr_data_sectors;
+
+                mddev->rdev[i].heads = mddev->data_disk_info->heads;
 
                 mddev->rdev[i].sb = malloc(sizeof(struct superblock));
 
@@ -147,6 +161,14 @@ void init_disk(struct mddev *mddev)
 
                 mddev->rdev[i].buf_write_ptr = 0;
                 mddev->rdev[i].buf_usage = nr_parity_buf;
+
+                mddev->rdev[i].disk_head.sector = 0;
+                mddev->rdev[i].disk_head.cylinder = 0;
+
+                mddev->rdev[i].nr_cylinders = nr_parity_cylinders;
+                mddev->rdev[i].nr_sectors   = nr_parity_sectors;
+
+                mddev->rdev[i].heads = mddev->parity_disk_info->heads;
 
                 mddev->rdev[i].sb = malloc(sizeof(struct superblock));
 
@@ -219,95 +241,129 @@ struct stripe_head* init_stripe_head(struct mddev *mddev)
 //         pr_debug_rt("buffer write time: %d (write back)\n", buf_time);
 // }
 
-// int rotate_disk(struct rdev *dev)
+
+// int buffer_flush(struct rdev *dev)
 // {
-//         ;
+//         // unsigned int bwt = dev->buf_write_ptr;  /* buf write ptr */
+
+//         static int wb_times;                    /* write buf times */
+//         static int bfr;                         /* buffer flush ratio */
+
+//         bfr = (bfr == 0) ? BUF_FLUSH_RATIO + rand() % BUF_FLUSH_DEVIATION
+//                          : bfr;
+                         
+//         if (dev->buf_usage > (dev->nr_buf * (1 - BUF_FLUSH_THRESHOLD))) {
+//                 if (wb_times++ < BUF_FLUSH_RATIO) {
+//                         return 0;
+//                 } else {
+//                         wb_times = 0;
+//                         bfr = BUF_FLUSH_RATIO + rand() % BUF_FLUSH_DEVIATION;
+
+//                         return 1000000;         /* (under construction!!) small flush */
+//                         // return rotate_disk(dev);
+//                 }
+//         } else {
+//                 return 20000000;                /* (under construction!!) big flush */
+//         }
 // }
 
-int buffer_flush(struct rdev *dev)
-{
-        // unsigned int bwt = dev->buf_write_ptr;  /* buf write ptr */
+// int buffer_write(struct rdev *dev, unsigned long bm_number, unsigned long bm_offset)
+// {
+//         unsigned int *ptr = &(dev->buf_write_ptr);
+//         int buf_time = 0;
 
-        static int wb_times;                    /* write buf times */
-        static int bfr;                         /* buffer flush ratio */
+//         buf_time += buffer_flush(dev);
+//         pr_debug("buffer_write, ptr = %d\n", (*ptr));
 
-        bfr = (bfr == 0) ? BUF_FLUSH_RATIO + rand() % BUF_FLUSH_DEVIATION
-                         : bfr;
-                         
-        if (dev->buf_usage > (dev->nr_buf * (1 - BUF_FLUSH_THRESHOLD))) {
-                if (wb_times++ < BUF_FLUSH_RATIO) {
-                        return 0;
-                } else {
-                        wb_times = 0;
-                        bfr = BUF_FLUSH_RATIO + rand() % BUF_FLUSH_DEVIATION;
+//         dev->buf[*ptr].number = bm_number;
+//         dev->buf[*ptr].offset = bm_offset; 
+//         (*ptr)++;
+//         dev->buf_usage--;
 
-                        return 1000000;         /* (under construction!!) small flush */
-                        // return rotate_disk(dev);
-                }
-        } else {
-                return 20000000;                /* (under construction!!) big flush */
-        }
-}
+//         return buf_time + BUF_WRITE_TIME + rand() % BUF_DEVIATION;
+// }
 
-int buffer_write(struct rdev *dev, unsigned long bm_number, unsigned long bm_offset)
-{
-        unsigned int *ptr = &(dev->buf_write_ptr);
-        int buf_time = 0;
-
-        buf_time += buffer_flush(dev);
-        pr_debug("buffer_write, ptr = %d\n", (*ptr));
-
-        dev->buf[*ptr].number = bm_number;
-        dev->buf[*ptr].offset = bm_offset; 
-        (*ptr)++;
-        dev->buf_usage--;
-
-        return buf_time + BUF_WRITE_TIME + rand() % BUF_DEVIATION;
-}
-
-int write_back(struct rdev *dev)
-{
-        dev->buf_write_ptr = 0;
-        pr_debug("\n\n\n\n\n\n\n\n\nbuf full!!!!\n\n\n\n\n\n\n\n\n");
+// int write_back(struct rdev *dev)
+// {
+//         dev->buf_write_ptr = 0;
+//         pr_debug("\n\n\n\n\n\n\n\n\nbuf full!!!!\n\n\n\n\n\n\n\n\n");
         
-        return DISK_WRITE_TIME * BUF_SIZE + rand() % BUF_DEVIATION;
+//         return DISK_WRITE_TIME * BUF_SIZE + rand() % BUF_DEVIATION;
+// }
+
+unsigned long rotate_time(struct rdev *dev, unsigned long sector, int platters)
+{
+        // printf("logic sector: %lu\n", sector);
+        unsigned long current_sector = (sector / platters / 8) % dev->nr_sectors;
+        printf("current sector: %lu\n", dev->disk_head.sector);
+        printf("new sector: %lu\n", current_sector);
+        // unsigned long current_sector = sector % dev->nr_sectors;
+        unsigned long rotate_sectors = (current_sector >= (dev->disk_head.sector * platters))
+                                        ? current_sector - dev->disk_head.sector
+                                        : dev->nr_sectors - (dev->disk_head.sector - current_sector);
+        
+        dev->disk_head.sector = current_sector;
+        printf("rotate sectors: %lu\n", rotate_sectors);
+        // printf("rotate time: %lu\n", rotate_sectors * ROTATE_PER_SECTOR);
+
+        return rotate_sectors * ROTATE_PER_SECTOR;
+}
+
+unsigned long seek_time(struct rdev *dev, unsigned long sector, int platters)
+{
+        unsigned long current_cylinder = (sector / platters / 8) / dev->nr_sectors;
+        // printf("seek time: %lu\n", current_cylinder);
+        // unsigned long current_cylinder = sector / dev->nr_sectors;
+        unsigned long seek_cylinders = (current_cylinder >= dev->disk_head.cylinder)
+                                        ? current_cylinder - dev->disk_head.cylinder
+                                        : dev->disk_head.cylinder - current_cylinder;
+
+        dev->disk_head.cylinder = current_cylinder;
+
+        // printf("seek time: %lu\n", current_cylinder);
+        // printf("seek time: %lu\n", seek_cylinders * SEEK_BETWEEN_TRACK);
+
+        return seek_cylinders * SEEK_BETWEEN_TRACK;
+}
+
+unsigned long transfer_time(void)
+{
+        return TRANSFER_TIME;
+}
+
+unsigned long controller_time(void)
+{
+        return CONTROLLER_TIME;
 }
 
 unsigned long generic_make_request(struct rdev *dev, int rw)
 {
         int i;
-        int buf_time;
-        unsigned int *ptr = &(dev->buf_write_ptr);
+        static int platter_num;
+        // unsigned int *ptr = &(dev->buf_write_ptr);
 
-        unsigned long pg_number = dev->sector / STRIPE_SECTORS;
-
-        pr_debug("pg_number: %lu\n", pg_number);
-
-        unsigned long bm_number = pg_number / sizeof(unsigned long);
-        unsigned long bm_offset = pg_number % sizeof(unsigned long);
-
-        pr_debug("bm_number: %lu\n", bm_number);
-        pr_debug("bm_offset: %lu\n", bm_offset);
+        unsigned long sector = dev->sector;
+        // pr_debug("pg_number: %lu\n", pg_number);
 
         /* search buffer */
-        for (i = 0; i < (*ptr); i++) {
-                if (dev->buf[i].number == bm_number &&
-                    dev->buf[i].offset == bm_offset) {
-                        if (rw == IO_READ) {
-                                buf_time = BUF_READ_TIME + rand() % BUF_DEVIATION;
-                                pr_debug_rt("buffer read hit time: %u\n", buf_time);
-                                return buf_time;
-                        } else {
-                                buf_time = BUF_WRITE_TIME + rand() % BUF_DEVIATION;
-                                pr_debug_rt("buffer write hit time: %u\n", buf_time);
-                                return buf_time;
-                        }
-                }
-        }
-        pr_debug("buffer miss\n");
+        // for (i = 0; i < (*ptr); i++) {
+        //         if (dev->buf[i].number == bm_number &&
+        //             dev->buf[i].offset == bm_offset) {
+        //                 if (rw == IO_READ) {
+        //                         buf_time = BUF_READ_TIME + rand() % BUF_DEVIATION;
+        //                         pr_debug_rt("buffer read hit time: %u\n", buf_time);
+        //                         return buf_time;
+        //                 } else {
+        //                         buf_time = BUF_WRITE_TIME + rand() % BUF_DEVIATION;
+        //                         pr_debug_rt("buffer write hit time: %u\n", buf_time);
+        //                         return buf_time;
+        //                 }
+        //         }
+        // }
+        // pr_debug("buffer miss\n");
 
         /* write to buf or flush the buf before write to buf */
-        buf_time = buffer_write(dev, bm_number, bm_offset);
+        // buf_time = buffer_write(dev, bm_number, bm_offset);
         // if ((*ptr) < (dev->nr_buf * BUF_FLUSH_RATIO)) {
         //         buf_time = buffer_write(dev, bm_number, bm_offset);
         //         pr_debug_rt("buffer write time: %d\n", buf_time);
@@ -315,8 +371,15 @@ unsigned long generic_make_request(struct rdev *dev, int rw)
         //         buf_time = buffer_write(dev, bm_number, bm_offset) + write_back(dev);
         //         pr_debug_rt("buffer write time: %d (write back)\n", buf_time);
         // }
-        
-        return buf_time;
+
+        // if (platter_num <= 2 * dev->platters) {
+        //         platter_num++;
+        //         return 0;
+        // } else {
+        //         ;
+        // }
+
+        return rotate_time(dev, sector, dev->heads) + seek_time(dev, sector, dev->heads);
 
         // if (!test_bit(bm_offset, &dev->sb->bitmap[bm_number]) && rw != IO_READ) {
         //         pr_debug("disk miss\n");
@@ -608,7 +671,10 @@ unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw)
         
         struct rdev *dev = &mddev->rdev[0];
 
-        unsigned long resp_time;
+        // dev->disk_head.cylinder = 0;
+        // dev->disk_head.sector = 0;
+
+        unsigned long resp_time = 0;
 
         unsigned long logical_sector = io->logical_sector / SECTOR_SIZE;
         unsigned long last_sector = logical_sector + io->length /SECTOR_SIZE;
@@ -618,14 +684,21 @@ unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw)
 
         for (; logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
                 dev->sector = logical_sector;
-                resp_time = generic_make_request(dev, rw);
-        }
-
+                resp_time += generic_make_request(dev, rw);
+                // printf("now rt: %lu\n", resp_time);
+                // printf("now sec: %lu\n", logical_sector);
+        } 
+        resp_time += transfer_time() + controller_time();
+        // printf("final now rt: %lu\n", resp_time);
         printf("\n[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n",
                 requst_times++, io->logical_sector, io->length, resp_time);
 
         // print_handle_list(mddev);
         // sleep(5);
         // sleep(15);
+        // dev->disk_head.sector -= 1;
+        printf("before: %lu\n", dev->disk_head.sector);
+        dev->disk_head.sector = (dev->disk_head.sector + dev->heads) % dev->nr_sectors;
+        printf("after: %lu\n", dev->disk_head.sector);
         return resp_time;
 }

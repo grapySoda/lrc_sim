@@ -41,4 +41,44 @@
 609918976 4096
 697901056 4096
 990068736 4096
+
+fio version 2 iolog
+/dev/sdc add
+/dev/sdc open
+/dev/sdc write 824633720832 1048576
+/dev/sdc write 824633720832 209715200
+/dev/sdc write 0 209715200
+/dev/sdc write 274877906944 209715200
+/dev/sdc write 0 209715200
+/dev/sdc write 549755813888 209715200
+/dev/sdc close
+
+fio version 2 iolog
+/dev/sdc add
+/dev/sdc open
+/dev/sdc write 0 104857600
+/dev/sdc write 107374182400 104857600
+/dev/sdc write 214748364800 104857600
+/dev/sdc write 322122547200 104857600
+/dev/sdc write 429496729600 104857600
+/dev/sdc write 536870912000 104857600
+/dev/sdc write 644245094400 104857600
+/dev/sdc write 751619276800 104857600
+/dev/sdc write 858993459200 104857600
+/dev/sdc close
+
+fio version 2 iolog
+/dev/sdc add
+/dev/sdc open
+/dev/sdc write 858993459200 104857600
+/dev/sdc write 751619276800 104857600
+/dev/sdc write 644245094400 104857600
+/dev/sdc write 536870912000 104857600
+/dev/sdc write 429496729600 104857600
+/dev/sdc write 322122547200 104857600
+/dev/sdc write 214748364800 104857600
+/dev/sdc write 107374182400 104857600
+/dev/sdc write 0 104857600
+/dev/sdc close
+
 git push -u origin main

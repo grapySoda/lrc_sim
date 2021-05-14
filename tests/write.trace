@@ -1,0 +1,9 @@
+fio version 2 iolog
+/dev/sdc add
+/dev/sdc open
+/dev/sdc write 858993459200 104857600
+/dev/sdc write 0 104857600
+/dev/sdc write 858993459200 104857600
+/dev/sdc write 0 104857600
+/dev/sdc write 858993459200 104857600
+/dev/sdc close

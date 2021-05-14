@@ -8,6 +8,8 @@
 
 #define PAGE_SHIFT		12
 
+#define PAGE_SIZE		4096
+
 #define SECTOR_SIZE		512
 #define STRIPE_SECTORS		8
 
@@ -16,14 +18,22 @@
 #define HANDLE_LIST_SIZE	65536
 #define MAPPING_TABLE_SIZE	65536
 
-/* delay time is based on micro-second */
-#define BUF_READ_TIME		42000
-#define BUF_WRITE_TIME		42000
+/* base on ns */
+#define ROTATE_PER_TRACK	8333330		/* 8.3 ms */
+#define ROTATE_PER_SECTOR	130000		/* 130 us */
+// #define ROTATE_PER_SECTOR	39150		/* 60  us */
+#define TRANSFER_TIME		39062		/* 39  us */
+#define SEEK_BETWEEN_TRACK	8		/* 8   ns */
+#define CONTROLLER_TIME		2500000		/* 2.5 ms */
 
-#define BUF_DEVIATION		3000		/* 3 microsecond deviation */
-#define BUF_FLUSH_DEVIATION	100		/* 100 requests deviation */
-#define BUF_FLUSH_THRESHOLD	0.9
-#define BUF_FLUSH_RATIO		450		/* flush once per 500 write requests */
+/* delay time is based on micro-second */
+// #define BUF_READ_TIME		42000
+// #define BUF_WRITE_TIME		42000
+
+// #define BUF_DEVIATION		3000		/* 3 microsecond deviation */
+// #define BUF_FLUSH_DEVIATION	100		/* 100 requests deviation */
+// #define BUF_FLUSH_THRESHOLD	0.9
+// #define BUF_FLUSH_RATIO		450		/* flush once per 500 write requests */
 // #define BUF_WB_TIME		200
 
 #define DISK_READ_TIME		6344000
@@ -93,6 +103,9 @@ struct disk_info {
 	const unsigned long 	buffer_size;	/* disk buf size */
 	const unsigned long	disk_capacity;	/* disk capacity */
 	const unsigned int	rpm;		/* rpm */
+	const unsigned int	nr_sectors;	/* sectors per track */
+	const unsigned int 	nr_cylinders;	/* cylinders per disk */
+	const int		heads;		/* heads */
 };
 
 enum {
@@ -155,12 +168,19 @@ struct buf {
 	int			offset;
 };
 
+struct disk_head {
+	unsigned int 		sector;
+	unsigned int 		cylinder;
+};
+
 struct rdev {
 	struct superblock	*sb;
 	struct buf		*buf;
 
 	char 			*disk_type;
-	unsigned int		disk_head;
+	
+	struct disk_head 	disk_head;
+
 	unsigned int		buf_write_ptr;
 	unsigned int 		buf_clean_ptr;
 
@@ -168,6 +188,11 @@ struct rdev {
 	unsigned long		nr_buf;
 	unsigned long		sector;		/* sector of this row */
 	unsigned long		flags;
+
+	unsigned int		nr_sectors;	/* sectors per track */
+	unsigned int 		nr_cylinders;	/* cylinders per disk */
+	
+	int			heads;		/* heads */
 };
 
 // struct shdev {

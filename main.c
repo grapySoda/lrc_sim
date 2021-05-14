@@ -23,8 +23,17 @@
 void raid_ctr_init(struct mddev *mddev)
 {
         struct disk_info disk_info[] = {
-	        {"cmr",	268435456, 1099511627776, 7200},        /* cmr, 256 MB, 1 TB, 7200 RPM */
-	        {"smr",	268435456, 1099511627776, 5400}         /* smr, 256 MB, 1 TB, 7200 RPM */
+	        {"cmr",	67108864, 1099511627776, 7200, 63, 1938021, 2},          /* cmr, 64 MB, 1 TB, 7,200 RPM, 
+                                                                                  * 63        sectors/track, 
+                                                                                  * 121,601   cylinders
+                                                                                  * 2         heads
+                                                                                  */
+
+	        {"smr",	67108864, 1099511627776, 5400, 63, 1938021, 2}           /* smr, 64 MB, 1 TB, 7,200 RPM, 
+                                                                                  * 63        sectors/track, 
+                                                                                  * 121,601   cylinders
+                                                                                  * 2         heads
+                                                                                  */
         };
         // char data_disk_type[] = "cmr";
         // char parity_disk_type[] = "cmr";
@@ -95,11 +104,11 @@ int main(void)
         printf("logical_sector: %lu, io->length: %lu\n", io->logical_sector, io->length);
         while (io) {
                 // resp_time = make_request(mddev, io);
-                // resp_time = test_single_disk(mddev, io, IO_WRITE);
+                resp_time = test_single_disk(mddev, io, IO_WRITE);
 
                 // if (io->lat > 600579)
-                if (io->lat > 600000)
-                        printf("[request %u] lat: %u\n", i, io->lat);
+                // if (io->lat > 600000)
+                //         printf("[request %u] lat: %u\n", i, io->lat);
 
                 fprintf(fp_output_log, "%u, %lu, %u, %lu, %lu\n",
                         io->time, resp_time, io->times, io->length, io->logical_sector);

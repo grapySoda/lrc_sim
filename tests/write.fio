@@ -1,12 +1,29 @@
 [global]
 filename=/dev/sdc
-rw=randwrite
-bs=4k
-size=100M
+#rw=randwrite
+#bs=4k
+#size=200M
+
+read_iolog=write.trace
+
 direct=1
 ioengine=sync
 log_offset=1
 replay_no_stall=1
+
+# by setting the submit mode to offload, we can guarantee a fixed rate of
+# submission regardless of what the device completion rate is.
+
+# io_submit_mode=offload
+# io_submit_mode=inline
+# rate_iops=1000
+
+# Real world random request flow follows Poisson process. To give better
+# insight on latency distribution, we simulate request flow under Poisson
+# process.
+
+# rate_process=poisson
+# rate_process=linear
 
 write_bw_log=rand-write
 write_lat_log=rand-write
