@@ -7,8 +7,10 @@
 #define DATA_SMR_PARITY_CMR	3	/* All of data disks used SMR tech, parity disks used CMR tech */
 
 #define PAGE_SHIFT		12
+#define ZONE_SHIFT		28
 
 #define PAGE_SIZE		4096
+#define SECTORS_PER_PAGE	8
 
 #define SECTOR_SIZE		512
 #define STRIPE_SECTORS		8
@@ -45,6 +47,10 @@
 
 #define DISK_HIT		100
 #define BUF_SIZE		256		/* MG */
+
+#define ZONE_EMPTY		0
+#define ZONE_OPEN		1
+#define ZONE_FULL		2
 
 // typedef int (*smr_translate_fn) (struct dm_target *target,
 // 			  unsigned int argc, char **argv);
@@ -99,13 +105,16 @@ struct raid_type {
 };
 
 struct disk_info {
-	const char 		*name;		/* RAID algorithm. */
+	const char 		*type;		/* disk type */
+	const int		heads;		/* heads */
 	const unsigned long 	buffer_size;	/* disk buf size */
 	const unsigned long	disk_capacity;	/* disk capacity */
 	const unsigned int	rpm;		/* rpm */
 	const unsigned int	nr_sectors;	/* sectors per track */
 	const unsigned int 	nr_cylinders;	/* cylinders per disk */
-	const int		heads;		/* heads */
+
+	/* if disk type is smr */
+	const unsigned int	zone_size;	/* bytes per zone */
 };
 
 enum {
@@ -173,13 +182,22 @@ struct disk_head {
 	unsigned int 		cylinder;
 };
 
+struct zone {
+	unsigned long		start_lba;
+	unsigned long		end_lba;
+	unsigned long		wp;		/* write pointer */
+	unsigned int		invalid_pages;
+	unsigned int		used_pages;
+	int			state;
+};
+
 struct rdev {
 	struct superblock	*sb;
 	struct buf		*buf;
 
 	char 			*disk_type;
 	
-	struct disk_head 	disk_head;
+	struct disk_head 	disk_head; 
 
 	unsigned int		buf_write_ptr;
 	unsigned int 		buf_clean_ptr;
@@ -192,7 +210,18 @@ struct rdev {
 	unsigned int		nr_sectors;	/* sectors per track */
 	unsigned int 		nr_cylinders;	/* cylinders per disk */
 	
-	int			heads;		/* heads */
+	int			heads;		/* the heads' position */
+
+	/* if disk type is smr */
+	unsigned int		zone_size;	/* bytes per zone */
+	unsigned long 		nr_zones;	/* number of zones per disk */
+	unsigned int		nr_pages;	/* number of pages per zone */
+
+	unsigned int		start_lba;
+	unsigned int		end_lba;
+
+	struct zone		*zones;
+	int			*mt;		/* mapping table */
 };
 
 // struct shdev {

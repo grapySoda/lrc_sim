@@ -7,6 +7,12 @@
 // #define DEBUG_SH
 // #define DEBUG_RT
 
+#ifdef BUG
+#define bug(M, ...) fprintf(stdout, "[log] " M , ##__VA_ARGS__)
+#else
+#define bug(M, ...)
+#endif
+
 #ifdef DEBUG
 #define pr_debug(M, ...) fprintf(stdout, "[log] " M , ##__VA_ARGS__)
 #else

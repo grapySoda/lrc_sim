@@ -1,0 +1,4 @@
+if (request == update) then
+        do read-modify-write operation;
+
+find the zone state which is open;

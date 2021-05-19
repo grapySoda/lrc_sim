@@ -23,17 +23,18 @@
 void raid_ctr_init(struct mddev *mddev)
 {
         struct disk_info disk_info[] = {
-	        {"cmr",	67108864, 1099511627776, 7200, 63, 1938021, 2},          /* cmr, 64 MB, 1 TB, 7,200 RPM, 
-                                                                                  * 63        sectors/track, 
-                                                                                  * 121,601   cylinders
-                                                                                  * 2         heads
-                                                                                  */
-
-	        {"smr",	67108864, 1099511627776, 5400, 63, 1938021, 2}           /* smr, 64 MB, 1 TB, 7,200 RPM, 
-                                                                                  * 63        sectors/track, 
-                                                                                  * 121,601   cylinders
-                                                                                  * 2         heads
-                                                                                  */
+                /* cmr, 64 MB, 1 TB, 7,200 RPM, 
+                 * 63        sectors/track, 
+                 * 1,938,021 cylinders
+                 * 2         heads
+                 */
+	        {"cmr",	67108864, 1099511627776, 7200, 63, 1938021, 2, 0},          
+                /* smr, 64 MB, 1 TB, 7,200 RPM, 
+                 * 63        sectors/track, 
+                 * 1,938,021 cylinders
+                 * 2         heads
+                 */
+	        {"smr",	67108864, 1099511627776, 5400, 63, 1938021, 2, 268435456}
         };
         // char data_disk_type[] = "cmr";
         // char parity_disk_type[] = "cmr";
