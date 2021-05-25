@@ -6,6 +6,7 @@
 // #define DEBUG
 // #define DEBUG_SH
 // #define DEBUG_RT
+#define DEBUG_Z
 
 #ifdef BUG
 #define bug(M, ...) fprintf(stdout, "[log] " M , ##__VA_ARGS__)
@@ -29,6 +30,12 @@
 #define pr_debug_rt(M, ...) fprintf(stdout, "[log] " M , ##__VA_ARGS__)
 #else
 #define pr_debug_rt(M, ...)
+#endif
+
+#ifdef DEBUG_Z
+#define pr_debug_z(M, ...) fprintf(stdout, M , ##__VA_ARGS__)
+#else
+#define pr_debug_z(M, ...)
 #endif
 
 #endif

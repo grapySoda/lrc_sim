@@ -1,6 +1,8 @@
 #ifndef _RAID_H_
 #define _RAID_H_
 
+#define DISK_STR_SIZE		8
+
 #define ALL_CMR 		0	/* All of disks used CMR tech */
 #define ALL_SMR 		1	/* All of disks used SMR tech */
 #define DATA_CMR_PARITY_SMR	2	/* All of data disks used CMR tech, parity disks used SMR tech */
@@ -106,12 +108,12 @@ struct raid_type {
 
 struct disk_info {
 	const char 		*type;		/* disk type */
-	const int		heads;		/* heads */
 	const unsigned long 	buffer_size;	/* disk buf size */
 	const unsigned long	disk_capacity;	/* disk capacity */
 	const unsigned int	rpm;		/* rpm */
 	const unsigned int	nr_sectors;	/* sectors per track */
 	const unsigned int 	nr_cylinders;	/* cylinders per disk */
+	const int		heads;		/* heads */
 
 	/* if disk type is smr */
 	const unsigned int	zone_size;	/* bytes per zone */
@@ -183,12 +185,13 @@ struct disk_head {
 };
 
 struct zone {
+	int					state;
 	unsigned long		start_lba;
 	unsigned long		end_lba;
 	unsigned long		wp;		/* write pointer */
 	unsigned int		invalid_pages;
 	unsigned int		used_pages;
-	int			state;
+	unsigned int		num;
 };
 
 struct rdev {

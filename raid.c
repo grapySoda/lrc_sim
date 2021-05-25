@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <time.h>
 
@@ -108,8 +109,8 @@ void init_disk(struct mddev *mddev)
         unsigned int nr_data_sectors     = mddev->data_disk_info->nr_sectors;
         unsigned int nr_parity_sectors   = mddev->parity_disk_info->nr_sectors;
 
-        unsigned long nr_data_bitmap     = mddev->data_disk_info->disk_capacity >> 16;
-        unsigned long nr_parity_bitmap   = mddev->parity_disk_info->disk_capacity >> 16;
+        // unsigned long nr_data_bitmap     = mddev->data_disk_info->disk_capacity >> 16;
+        // unsigned long nr_parity_bitmap   = mddev->parity_disk_info->disk_capacity >> 16;
         
         unsigned long nr_data_buf        = mddev->data_disk_info->buffer_size >> PAGE_SHIFT;
         unsigned long nr_parity_buf      = mddev->parity_disk_info->buffer_size >> PAGE_SHIFT;
@@ -118,6 +119,11 @@ void init_disk(struct mddev *mddev)
         
         /* init data_disk's bitmap */
         for (i = 0; i < data_disks; i++) {
+                mddev->rdev[i].disk_type = malloc(sizeof(char) * DISK_STR_SIZE);
+
+                strcpy(mddev->rdev[i].disk_type, mddev->data_disk_info->type);
+                printf("disk type: %s\n", mddev->rdev[i].disk_type);
+
                 mddev->rdev[i].nr_buf = nr_data_buf;
                 mddev->rdev[i].flags = 0;
 
@@ -132,15 +138,15 @@ void init_disk(struct mddev *mddev)
 
                 mddev->rdev[i].heads = mddev->data_disk_info->heads;
 
-                mddev->rdev[i].sb = malloc(sizeof(struct superblock));
-
-                if (mddev->data_disk_info->type == "smr") {
+                // mddev->rdev[i].sb = malloc(sizeof(struct superblock));
+                if (!strcmp(mddev->data_disk_info->type, "smr")) {
                         mddev->rdev[i].nr_zones = mddev->data_disk_info->disk_capacity >> ZONE_SHIFT;
                         mddev->rdev[i].zone_size = mddev->data_disk_info->zone_size;
                         mddev->rdev[i].nr_pages = mddev->data_disk_info->zone_size/ PAGE_SIZE;
                         nr_pages = mddev->data_disk_info->disk_capacity / PAGE_SIZE ;
 
                         wp_start_lba = 0;
+                        printf("malloc zones: %lu\n", sizeof(struct zone) * mddev->rdev[i].nr_zones);
                         mddev->rdev[i].zones = malloc(sizeof(struct zone) * mddev->rdev[i].nr_zones);
                         mddev->rdev[i].mt    = malloc(sizeof(int) * (nr_pages));
 
@@ -149,41 +155,46 @@ void init_disk(struct mddev *mddev)
                         }
 
                         for (j = 0; j < mddev->rdev[i].nr_zones; j++) {
+                                mddev->rdev[i].zones[j].num = j;
                                 mddev->rdev[i].zones[j].wp = wp_start_lba;
                                 mddev->rdev[i].zones[j].start_lba = wp_start_lba;
-                                mddev->rdev[i].zones[j].end_lba = wp_start_lba + PAGE_SIZE - 1;
+                                mddev->rdev[i].zones[j].end_lba = wp_start_lba + mddev->parity_disk_info->zone_size - 1;
                                 mddev->rdev[i].zones[j].invalid_pages = 0;
                                 mddev->rdev[i].zones[j].used_pages = 0;
                                 mddev->rdev[i].zones[j].state = 0;
-                                wp_start_lba += PAGE_SIZE;
+                                wp_start_lba += mddev->parity_disk_info->zone_size;
                         }
                 }
 
                 /* init bitmap */
-                mddev->rdev[i].sb->bitmap  = malloc(sizeof(unsigned long) * nr_data_bitmap);
-                if (mddev->rdev[i].sb->bitmap)
-                        pr_debug("init_disk, dev[%d] bitmap allocate success.\n", i);
-                else 
-                        pr_debug("init_disk, dev[%d] bitmap allocate failed.\n", i);
+                // mddev->rdev[i].sb->bitmap  = malloc(sizeof(unsigned long) * nr_data_bitmap);
+                // if (mddev->rdev[i].sb->bitmap)
+                //         pr_debug("init_disk, dev[%d] bitmap allocate success.\n", i);
+                // else 
+                //         pr_debug("init_disk, dev[%d] bitmap allocate failed.\n", i);
 
-                for (j = 0; j < nr_data_bitmap; j++)
-                        mddev->rdev[i].sb->bitmap[j] = 0;
+                // for (j = 0; j < nr_data_bitmap; j++)
+                //         mddev->rdev[i].sb->bitmap[j] = 0;
 
                 /* init buffer */
-                mddev->rdev[i].buf = malloc(sizeof(struct buf) * nr_data_buf);
-                if (mddev->rdev[i].buf)
-                        pr_debug("init_disk, dev[%d] buffer allocate success.\n", i);
-                else
-                        pr_debug("init_disk, dev[%d] buffer allocate failed.\n", i);
+                // mddev->rdev[i].buf = malloc(sizeof(struct buf) * nr_data_buf);
+                // if (mddev->rdev[i].buf)
+                //         pr_debug("init_disk, dev[%d] buffer allocate success.\n", i);
+                // else
+                //         pr_debug("init_disk, dev[%d] buffer allocate failed.\n", i);
 
-                for (j = 0; j < nr_data_buf; j++) {
-                        mddev->rdev[i].buf[j].number = -1;
-                        mddev->rdev[i].buf[j].offset = -1;
-                }
+                // for (j = 0; j < nr_data_buf; j++) {
+                //         mddev->rdev[i].buf[j].number = -1;
+                //         mddev->rdev[i].buf[j].offset = -1;
+                // }
         }
 
         /* init parity_disk's bitmap */
         for (i = data_disks; i < raid_disks; i++) {
+                mddev->rdev[i].disk_type = malloc(sizeof(char) * DISK_STR_SIZE);
+
+                strcpy(mddev->rdev[i].disk_type, mddev->parity_disk_info->type);
+                printf("disk type: %s\n", mddev->rdev[i].disk_type);
                 mddev->rdev[i].flags = 0;
                 mddev->rdev[i].nr_buf = nr_parity_buf;
 
@@ -198,12 +209,11 @@ void init_disk(struct mddev *mddev)
 
                 mddev->rdev[i].heads = mddev->parity_disk_info->heads;
 
-                mddev->rdev[i].sb = malloc(sizeof(struct superblock));
-
-                if (mddev->parity_disk_info->type == "smr") {
+                // mddev->rdev[i].sb = malloc(sizeof(struct superblock));
+                if (!strcmp(mddev->parity_disk_info->type, "smr")) {
                         mddev->rdev[i].nr_zones = mddev->parity_disk_info->disk_capacity >> ZONE_SHIFT;
                         mddev->rdev[i].zone_size = mddev->parity_disk_info->zone_size;
-                        mddev->rdev[i].nr_pages = mddev->parity_disk_info->zone_size/ PAGE_SIZE;
+                        mddev->rdev[i].nr_pages = mddev->parity_disk_info->zone_size / PAGE_SIZE;
                         nr_pages = mddev->parity_disk_info->disk_capacity / PAGE_SIZE;
 
                         wp_start_lba = 0;
@@ -217,35 +227,35 @@ void init_disk(struct mddev *mddev)
                         for (j = 0; j < mddev->rdev[i].nr_zones; j++) {
                                 mddev->rdev[i].zones[j].wp = wp_start_lba;
                                 mddev->rdev[i].zones[j].start_lba = wp_start_lba;
-                                mddev->rdev[i].zones[j].end_lba = wp_start_lba + PAGE_SIZE - 1;
+                                mddev->rdev[i].zones[j].end_lba = wp_start_lba + mddev->parity_disk_info->zone_size - 1;
                                 mddev->rdev[i].zones[j].invalid_pages = 0;
                                 mddev->rdev[i].zones[j].used_pages = 0;
                                 mddev->rdev[i].zones[j].state = 0;
-                                wp_start_lba += PAGE_SIZE;
+                                wp_start_lba += mddev->parity_disk_info->zone_size;
                         }
                 }
 
                 /* init bitmap */
-                mddev->rdev[i].sb->bitmap = malloc(sizeof(unsigned long) * nr_parity_bitmap);
-                if (mddev->rdev[i].sb->bitmap)
-                        pr_debug("init_disk, dev[%d] bitmap allocate success.\n", i);
-                else
-                        pr_debug("init_disk, dev[%d] bitmap allocate failed.\n", i);
+                // mddev->rdev[i].sb->bitmap = malloc(sizeof(unsigned long) * nr_parity_bitmap);
+                // if (mddev->rdev[i].sb->bitmap)
+                //         pr_debug("init_disk, dev[%d] bitmap allocate success.\n", i);
+                // else
+                //         pr_debug("init_disk, dev[%d] bitmap allocate failed.\n", i);
 
-                for (j = 0; j < nr_parity_bitmap; j++)
-                        mddev->rdev[i].sb->bitmap[j] = 0;
+                // for (j = 0; j < nr_parity_bitmap; j++)
+                //         mddev->rdev[i].sb->bitmap[j] = 0;
 
                 /* init buffer */
-                mddev->rdev[i].buf = malloc(sizeof(struct buf) * nr_parity_buf);
-                if (mddev->rdev[i].buf)
-                        pr_debug("init_disk, dev[%d] buffer allocate success.\n", i);
-                else
-                        pr_debug("init_disk, dev[%d] buffer allocate failed.\n", i);
+                // mddev->rdev[i].buf = malloc(sizeof(struct buf) * nr_parity_buf);
+                // if (mddev->rdev[i].buf)
+                //         pr_debug("init_disk, dev[%d] buffer allocate success.\n", i);
+                // else
+                //         pr_debug("init_disk, dev[%d] buffer allocate failed.\n", i);
 
-                for (j = 0; j < nr_parity_buf; j++) {
-                        mddev->rdev[i].buf[j].number = 0;
-                        mddev->rdev[i].buf[j].offset = 0;
-                }
+                // for (j = 0; j < nr_parity_buf; j++) {
+                //         mddev->rdev[i].buf[j].number = 0;
+                //         mddev->rdev[i].buf[j].offset = 0;
+                // }
         }
 
         // printf("size of data_disk's bitmap: %lu\n", mddev->sb[0].bitmap[nr_data_bitmap-1]);
@@ -348,15 +358,15 @@ unsigned long rotate_time(struct rdev *dev, unsigned long sector, int platters)
 {
         // printf("logic sector: %lu\n", sector);
         unsigned long current_sector = (sector / platters / SECTORS_PER_PAGE) % dev->nr_sectors;
-        printf("current sector: %lu\n", dev->disk_head.sector);
-        printf("new sector: %lu\n", current_sector);
+        // printf("current sector: %u\n", dev->disk_head.sector);
+        // printf("new sector: %lu\n", current_sector);
         // unsigned long current_sector = sector % dev->nr_sectors;
         unsigned long rotate_sectors = (current_sector >= (dev->disk_head.sector * platters))
                                         ? current_sector - dev->disk_head.sector
                                         : dev->nr_sectors - (dev->disk_head.sector - current_sector);
         
         dev->disk_head.sector = current_sector;
-        printf("rotate sectors: %lu\n", rotate_sectors);
+        // printf("rotate sectors: %lu\n", rotate_sectors);
         // printf("rotate time: %lu\n", rotate_sectors * ROTATE_PER_SECTOR);
 
         return rotate_sectors * ROTATE_PER_SECTOR;
@@ -394,80 +404,145 @@ unsigned long controller_time(void)
 //         ;
 // }
 
-void migrate_zone(struct zone* z)
-{
-        ; 
-}
-
-void reset_write_pointer(struct zone* z)
-{
-        ;
-}
-
-unsigned long read_modify_write(struct rdev *dev, struct zone* z)
-{
-        int i;
-
-        unsigned long sector = dev->sector;
-        unsigned long rmw = 0;
-
-        unsigned int start_page;
-        unsigned int end_page;
-
-        unsigned int new_start_page;
-        unsigned int new_end_page;
-
-        struct zone* nz = get_empty_zone(dev);                  /* new zone */
-
-        /* read from previous zone */
-        rmw = 0;
-        start_page = z->start_lba / PAGE_SIZE;
-        end_page = (z->end_lba - z->start_lba) / PAGE_SIZE;
-
-        new_start_page = nz->start_lba / PAGE_SIZE;
-
-        for (i = 0; i < end_page; i++) {
-                dev->mt[start_page + i] = new_start_page + i;
-                nz->wp += PAGE_SIZE;
-        }
-
-        return rotate_time(dev, sector, dev->heads) + seek_time(dev, sector, dev->heads);
-}
-
 struct zone* get_open_zone(struct rdev *dev)
 {
         int i;
         for (i = 0; i < dev->nr_zones; i++) 
-                if (&dev->zones[i].state == ZONE_OPEN)
+                if (dev->zones[i].state == ZONE_OPEN) {
+                        pr_debug_z("get open zone %u\n", i);
                         return &dev->zones[i];
+                }
 
-        puts("No open zone");
+        pr_debug_z("No open zone\n");
         return NULL;
-        
 }
 
 struct zone* get_empty_zone(struct rdev *dev)
 {
         int i;
         for (i = 0; i < dev->nr_zones; i++)
-                if (dev->zones[i].state == ZONE_EMPTY)
+                if (dev->zones[i].state == ZONE_EMPTY) {
+                        pr_debug_z("get empty zone %u\n", i);
                         return &dev->zones[i];
+                }
 
-        puts("No empty zone");
+        pr_debug_z("No empty zone\n");
         return NULL;
 }
 
+void reset_write_pointer(struct zone* z)
+{
+        z->used_pages = 0;
+        z->invalid_pages = 0;
+        z->wp = z->start_lba;
+        z->state = ZONE_EMPTY;
+}
+
+void print_mapping_table(struct rdev *dev)
+{
+        unsigned long i;
+        unsigned long pages = dev->nr_pages * dev->nr_zones;
+
+        pr_debug_z("print mapping table:\n");
+        for (i = 0; i < pages; i++) {
+                if (dev->mt[i] >= 0)
+                        pr_debug_z("%lu -> %lu\n", i, dev->mt[i]);
+        }
+}
+
+unsigned long read_modify_write(struct rdev *dev, struct zone* z)
+{
+        int offset;
+        unsigned int i , temp;
+
+        unsigned long sector;
+        unsigned long rmw = 0;
+        unsigned long pages = dev->nr_pages * dev->nr_zones;
+
+        unsigned int start_page;
+        unsigned int end_page;
+
+        unsigned int nz_start_page;
+
+        struct zone* nz = get_empty_zone(dev);                  /* new zone */
+
+        rmw = 0;
+        start_page = z->start_lba / PAGE_SIZE;
+        nz_start_page = nz->start_lba / PAGE_SIZE;
+        
+        // pr_debug_z("before RMW, %u, %u\n", start_page, nz_start_page);
+        // print_mapping_table(dev);
+
+        /* caculate read time from previous zone and modify mapping table */
+        if (z->state != ZONE_FULL) {
+                end_page = (z->wp - z->start_lba) / PAGE_SIZE;
+                for (offset = 0; offset < end_page; offset++) {
+                        // pr_debug_z("pages %u\n", offset);
+                        sector = (start_page + offset) * PAGE_SIZE;
+
+                        for (i = 0; i < pages; i++) {
+                                if (dev->mt[i] == start_page + offset) {
+                                        temp = i;
+                                        break;
+                                }
+                        }
+
+                        dev->mt[temp] = nz_start_page + offset;
+                        nz->wp += PAGE_SIZE;
+
+                        rmw += rotate_time(dev, sector, dev->heads) + seek_time(dev, sector, dev->heads);
+                }
+                nz->state = ZONE_OPEN;
+        } else {
+                end_page = (z->end_lba - z->start_lba) / PAGE_SIZE;
+                for (offset = 0; offset < end_page; offset++) {
+                        // pr_debug_z("pages %u\n", offset);
+                        sector = (start_page + offset) * PAGE_SIZE;
+
+                        for (i = 0; i < pages; i++) {
+                                if (dev->mt[i] == start_page + offset) {
+                                        temp = i;
+                                        break;
+                                }
+                        }
+
+                        dev->mt[temp] = nz_start_page + offset;
+
+                        rmw += rotate_time(dev, sector, dev->heads) + seek_time(dev, sector, dev->heads);
+                }
+                nz->state = ZONE_FULL;
+        }
+
+        /* caculate write time from following zone*/
+        for (offset = 0; offset < end_page; offset++) {
+                sector = (nz_start_page + offset) * PAGE_SIZE;
+
+                rmw += rotate_time(dev, sector, dev->heads) + seek_time(dev, sector, dev->heads);
+        }
+
+        // pr_debug_z("after RMW\n");
+        // print_mapping_table(dev);
+
+        /* reset previous zone */
+        reset_write_pointer(z);
+
+        return rmw;
+}
+
+
 unsigned long shingled_translation(struct rdev *dev)
 {
+        pr_debug_z("shingled_translation\n");
         struct zone* z;
 
         unsigned long rmw = 0;
         unsigned long logical_page = dev->sector / SECTORS_PER_PAGE;
-        unsigned long physical_page;
 
-        unsigned int zone_num = logical_page / dev->nr_pages;
+        unsigned int zone_num;
 
         if (dev->mt[logical_page] >= 0) {
+                zone_num = dev->mt[logical_page] / dev->nr_pages;
+                pr_debug_z("read_modify_write, zone_num: %u\n", zone_num);
                 z = &dev->zones[zone_num];
                 rmw = read_modify_write(dev, z);
                 
@@ -477,15 +552,17 @@ unsigned long shingled_translation(struct rdev *dev)
         z = get_open_zone(dev);
         if (!z) {
                 z = get_empty_zone(dev);
-                if (z)
+                if (z) {
                         z->state = ZONE_OPEN;     
-                else
+                } else
                         return 1;
         }
 
         dev->sector = z->wp; 
         dev->mt[logical_page] = z->wp / PAGE_SIZE;
+        pr_debug_z("[mapping table] logical_page: %lu -> %lu\n", logical_page, z->wp / PAGE_SIZE);
         z->wp += PAGE_SIZE;
+        z->used_pages++;
 
         if (z->wp >= z->end_lba)
                 z->state = ZONE_FULL;
@@ -495,14 +572,14 @@ unsigned long shingled_translation(struct rdev *dev)
 
 unsigned long generic_make_request(struct rdev *dev, int rw)
 {
-        int i;
-        static int platter_num;
+        // int i;
+        // static int platter_num;
         unsigned long rmw = 0;
         // unsigned int *ptr = &(dev->buf_write_ptr);
-
-        if (dev->disk_type == "smr") {
+        if (!strcmp(dev->disk_type, "smr"))
                 rmw = shingled_translation(dev);
-        }
+
+        // print_mapping_table(dev);
 
         unsigned long sector = dev->sector;
         // pr_debug("pg_number: %lu\n", pg_number);
@@ -818,7 +895,7 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
         for (i = 0; mddev->handle_list[i]; i++)
                 resp_time += handle_stripe(mddev->handle_list[i], mddev, &stripe_num);
 
-        printf("\n[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n",
+        printf("[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n\n",
                 requst_times++, io->logical_sector, io->length, resp_time);
 
         // print_handle_list(mddev);
@@ -830,7 +907,7 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
 
 unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw)
 {       
-        int i;
+        // int i;
         static unsigned long requst_times;
         
         struct rdev *dev = &mddev->rdev[0];
@@ -854,15 +931,15 @@ unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw)
         } 
         resp_time += transfer_time() + controller_time();
         // printf("final now rt: %lu\n", resp_time);
-        printf("\n[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n",
+        printf("[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n\n",
                 requst_times++, io->logical_sector, io->length, resp_time);
 
         // print_handle_list(mddev);
         // sleep(5);
         // sleep(15);
         // dev->disk_head.sector -= 1;
-        printf("before: %lu\n", dev->disk_head.sector);
+        // printf("before: %u\n", dev->disk_head.sector);
         dev->disk_head.sector = (dev->disk_head.sector + dev->heads) % dev->nr_sectors;
-        printf("after: %lu\n", dev->disk_head.sector);
+        // printf("after: %u\n", dev->disk_head.sector);
         return resp_time;
 }

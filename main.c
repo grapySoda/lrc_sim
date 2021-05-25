@@ -44,12 +44,12 @@ void raid_ctr_init(struct mddev *mddev)
         mddev->parity_disks = 1;
         mddev->chunk_sectors = CHUNK_SECTORS;
 
-        mddev->data_disk_info = &disk_info[0];
+        // mddev->data_disk_info = &disk_info[0];
+        mddev->data_disk_info = &disk_info[1];
         mddev->parity_disk_info = &disk_info[1];
 
         // mddev->data_disk_type = data_disk_type;
         // mddev->parity_disk_type = parity_disk_type;
-
         init_disk(mddev);
         // for (i = 0; i < HANDLE_LIST_SIZE; i++) {
         //         mddev->handle_list[i] = ;
@@ -85,6 +85,7 @@ void raid_ctr_init(struct mddev *mddev)
 
 int main(void)
 {
+        puts("");
         unsigned int i = 1;
         struct mddev *mddev = malloc(sizeof(struct mddev));
         struct io *io = malloc(sizeof(struct io));
@@ -98,11 +99,12 @@ int main(void)
         fp_output_log = fopen(OUTPUT_LAT_LOG, "w");
 
         raid_ctr_init(mddev);
+        puts("");
 
         fscanf(fp_trace, "%u, %u, %u, %lu, %lu",
                &io->time, &io->lat, &io->times, &io->length, &io->logical_sector);
 
-        printf("logical_sector: %lu, io->length: %lu\n", io->logical_sector, io->length);
+        // printf("logical_sector: %lu, io->length: %lu\n", io->logical_sector, io->length);
         while (io) {
                 // resp_time = make_request(mddev, io);
                 resp_time = test_single_disk(mddev, io, IO_WRITE);

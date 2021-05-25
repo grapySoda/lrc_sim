@@ -1,10 +1,10 @@
 [global]
 filename=/dev/sdc
-#rw=randwrite
-#bs=4k
-#size=200M
+rw=randwrite
+bs=4k
+size=10M
 
-read_iolog=write.trace
+#read_iolog=write.trace
 
 direct=1
 ioengine=sync
