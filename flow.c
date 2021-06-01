@@ -47,3 +47,42 @@ unsigned long generic_make_request_smr(struct rdev *dev, int rw)
                 }
         }
 }
+
+unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw)
+{       
+        // int i;
+        static unsigned long requst_times;
+        
+        struct rdev *dev = &mddev->rdev[0];
+
+        // dev->disk_head.cylinder = 0;
+        // dev->disk_head.sector = 0;
+
+        unsigned long resp_time = 0;
+
+        unsigned long logical_sector = io->logical_sector / SECTOR_SIZE;
+        unsigned long last_sector = logical_sector + io->length /SECTOR_SIZE;
+        
+        // for (i = 0; i < mddev->parity_disks + mddev->data_disks; i++)
+        //         pr_debug_sh("disk[%d]: %d\n", i, *(mddev->rdev[i].buf_ptr));
+
+        for (; logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
+                dev->sector = logical_sector;
+                resp_time += generic_make_request(dev, rw);
+                // printf("now rt: %lu\n", resp_time);
+                // printf("now sec: %lu\n", logical_sector);
+        } 
+        resp_time += transfer_time() + controller_time();
+        // printf("final now rt: %lu\n", resp_time);
+        printf("[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n\n",
+                requst_times++, io->logical_sector, io->length, resp_time);
+
+        // print_handle_list(mddev);
+        // sleep(5);
+        // sleep(15);
+        // dev->disk_head.sector -= 1;
+        // printf("before: %u\n", dev->disk_head.sector);
+        dev->disk_head.sector = (dev->disk_head.sector + dev->heads) % dev->nr_sectors;
+        // printf("after: %u\n", dev->disk_head.sector);
+        return resp_time;
+}

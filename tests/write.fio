@@ -1,18 +1,19 @@
 [global]
-filename=/dev/sdc
-rw=randwrite
-bs=4k
-size=10M
+#filename=/dev/sdc
+#filename=/dev/md5
+#rw=write
+#bs=4k
+#size=10M
 
-#read_iolog=write.trace
+read_iolog=write.trace
 
 direct=1
-ioengine=sync
+ioengine=libaio
 log_offset=1
-replay_no_stall=1
+#replay_no_stall=1
 
 # by setting the submit mode to offload, we can guarantee a fixed rate of
-# submission regardless of what the device completion rate is.
+# submission regardless of what the device completion rate is.d
 
 # io_submit_mode=offload
 # io_submit_mode=inline
@@ -23,8 +24,9 @@ replay_no_stall=1
 # process.
 
 # rate_process=poisson
-# rate_process=linear
+rate_process=linear
 
+write_iolog=replay-write
 write_bw_log=rand-write
 write_lat_log=rand-write
 write_iops_log=rand-write

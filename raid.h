@@ -8,6 +8,8 @@
 #define DATA_CMR_PARITY_SMR	2	/* All of data disks used CMR tech, parity disks used SMR tech */
 #define DATA_SMR_PARITY_CMR	3	/* All of data disks used SMR tech, parity disks used CMR tech */
 
+#define NS2MS			1000000
+
 #define PAGE_SHIFT		12
 #define ZONE_SHIFT		28
 
@@ -23,12 +25,14 @@
 #define MAPPING_TABLE_SIZE	65536
 
 /* base on ns */
-#define ROTATE_PER_TRACK	8333330		/* 8.3 ms */
+#define ROTATE_PER_TRACK	8333330	 	/* 8.3 ms */
 #define ROTATE_PER_SECTOR	130000		/* 130 us */
 // #define ROTATE_PER_SECTOR	39150		/* 60  us */
 #define TRANSFER_TIME		39062		/* 39  us */
 #define SEEK_BETWEEN_TRACK	8		/* 8   ns */
-#define CONTROLLER_TIME		2500000		/* 2.5 ms */
+#define CONTROLLER_TIME		1000000		/* 1 ms */
+
+#define RAID_5_CAL_DELAY	2500000		/* 1 ms */
 
 /* delay time is based on micro-second */
 // #define BUF_READ_TIME		42000
@@ -133,6 +137,8 @@ enum {
 enum rdev_flags {
 	R_Wantread,
 	R_Wantwrite,
+	R_Appended,
+	R_Reversed,
 };
 
 // struct disk_info {
@@ -195,6 +201,7 @@ struct zone {
 };
 
 struct rdev {
+	int 			num;		/* just for debug */
 	struct superblock	*sb;
 	struct buf		*buf;
 

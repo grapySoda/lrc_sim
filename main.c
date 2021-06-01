@@ -8,8 +8,8 @@
 
 #define DISKS_INFO              "disks.info"
 #define RAID_CONFIG             "raid.config"
-#define TRACE_FILE              "/home/ccs/project_lrc_sim/tests/rand-write_lat.1.log"
-#define OUTPUT_LAT_LOG          "/home/ccs/project_lrc_sim/tests/sim-rand-write_lat.1.log"
+#define TRACE_FILE              "/home/ccs/test/lrc_sim/tests/rand-write_lat.1.log"
+#define OUTPUT_LAT_LOG          "/home/ccs/test/lrc_sim/tests/sim-rand-write_lat.1.log"
 // #define TRACE_FILE      "randwrite.trace"
 
 // raid_types[] = {
@@ -39,14 +39,14 @@ void raid_ctr_init(struct mddev *mddev)
         // char data_disk_type[] = "cmr";
         // char parity_disk_type[] = "cmr";
 
-        mddev->data_disks = 3;
+        mddev->data_disks = 2;
         mddev->level = 5;
         mddev->parity_disks = 1;
         mddev->chunk_sectors = CHUNK_SECTORS;
 
         // mddev->data_disk_info = &disk_info[0];
         mddev->data_disk_info = &disk_info[1];
-        mddev->parity_disk_info = &disk_info[1];
+        mddev->parity_disk_info = &disk_info[0];
 
         // mddev->data_disk_type = data_disk_type;
         // mddev->parity_disk_type = parity_disk_type;
@@ -91,6 +91,7 @@ int main(void)
         struct io *io = malloc(sizeof(struct io));
 
         unsigned long resp_time;
+        long arrival_time;
 
         FILE *fp_trace = NULL;
         FILE *fp_output_log = NULL;
@@ -104,10 +105,12 @@ int main(void)
         fscanf(fp_trace, "%u, %u, %u, %lu, %lu",
                &io->time, &io->lat, &io->times, &io->length, &io->logical_sector);
 
+        arrival_time = io->time - (io->lat / NS2MS);
+
         // printf("logical_sector: %lu, io->length: %lu\n", io->logical_sector, io->length);
         while (io) {
-                // resp_time = make_request(mddev, io);
-                resp_time = test_single_disk(mddev, io, IO_WRITE);
+                resp_time = make_request(mddev, io);
+                // resp_time = test_single_disk(mddev, io, IO_WRITE);
 
                 // if (io->lat > 600579)
                 // if (io->lat > 600000)
@@ -119,6 +122,9 @@ int main(void)
                 if (fscanf(fp_trace, "%u, %u, %u, %lu, %lu",
                            &io->time, &io->lat, &io->times, &io->length, &io->logical_sector) == EOF)
                         io = NULL;
+
+                if (io)
+                        arrival_time = io->time - (io->lat / NS2MS);
 
                 i++;
         }

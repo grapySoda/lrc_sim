@@ -2,8 +2,10 @@ all:
 	# sudo hdparm -F /dev/sdc
 	sudo hdparm -a0 -A0 -W0 /dev/sdc
 	# sudo hdparm -a1 -A1 -W1 /dev/sdc
+	cp /home/ccs/skylight/tests/drive-type/write.trace ./
 	sudo fio write.fio
-	cd .. && ./run.sh
+	# cd .. && ./run.sh
+	# cd .. && ./translate
 	gnuplot drive-type.gp
 	evince drive-type.eps
 

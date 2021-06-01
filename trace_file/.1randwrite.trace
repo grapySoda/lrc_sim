@@ -87,5 +87,13 @@ fio version 2 iolog
 2689, 523102153, 1, 104857600, 0
 3500, 810654323, 1, 104857600, 858993459200
 
+/* Create */
+sudo mdadm -Cv /dev/md5 -l 5 -n 2 -x 1 /dev/sdb /dev/sdc /dev/sdd
+sudo mdadm -D /dev/md5
+
+/* Delete */
+sed -i '$d' /etc/fstab
+sudo mdadm -S /dev/md5
+sudo mdadm --misc --zero-superblock /dev/sd[b-d]
 
 git push -u origin main

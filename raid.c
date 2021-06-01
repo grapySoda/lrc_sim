@@ -119,6 +119,7 @@ void init_disk(struct mddev *mddev)
         
         /* init data_disk's bitmap */
         for (i = 0; i < data_disks; i++) {
+                mddev->rdev[i].num = i;
                 mddev->rdev[i].disk_type = malloc(sizeof(char) * DISK_STR_SIZE);
 
                 strcpy(mddev->rdev[i].disk_type, mddev->data_disk_info->type);
@@ -149,6 +150,9 @@ void init_disk(struct mddev *mddev)
                         printf("malloc zones: %lu\n", sizeof(struct zone) * mddev->rdev[i].nr_zones);
                         mddev->rdev[i].zones = malloc(sizeof(struct zone) * mddev->rdev[i].nr_zones);
                         mddev->rdev[i].mt    = malloc(sizeof(int) * (nr_pages));
+
+                        set_bit(R_Appended, &mddev->rdev[i].flags);
+                        set_bit(R_Reversed, &mddev->rdev[i].flags);
 
                         for (j = 0; j < nr_pages; j++) {
                                 mddev->rdev[i].mt[j] = -1;
@@ -191,6 +195,7 @@ void init_disk(struct mddev *mddev)
 
         /* init parity_disk's bitmap */
         for (i = data_disks; i < raid_disks; i++) {
+                mddev->rdev[i].num = i;
                 mddev->rdev[i].disk_type = malloc(sizeof(char) * DISK_STR_SIZE);
 
                 strcpy(mddev->rdev[i].disk_type, mddev->parity_disk_info->type);
@@ -219,6 +224,9 @@ void init_disk(struct mddev *mddev)
                         wp_start_lba = 0;
                         mddev->rdev[i].zones = malloc(sizeof(struct zone) * mddev->rdev[i].nr_zones);
                         mddev->rdev[i].mt    = malloc(sizeof(int) * (nr_pages));
+
+                        set_bit(R_Appended, &mddev->rdev[i].flags);
+                        set_bit(R_Reversed, &mddev->rdev[i].flags);
 
                         for (j = 0; j < nr_pages; j++) {
                                 mddev->rdev[i].mt[j] = -1;
@@ -385,6 +393,8 @@ unsigned long seek_time(struct rdev *dev, unsigned long sector, int platters)
 
         // printf("seek time: %lu\n", current_cylinder);
         // printf("seek time: %lu\n", seek_cylinders * SEEK_BETWEEN_TRACK);
+        dev->disk_head.sector += (seek_cylinders * SEEK_BETWEEN_TRACK / ROTATE_PER_SECTOR) * platters;
+        dev->disk_head.sector %= dev->nr_sectors;
 
         return seek_cylinders * SEEK_BETWEEN_TRACK;
 }
@@ -529,6 +539,21 @@ unsigned long read_modify_write(struct rdev *dev, struct zone* z)
         return rmw;
 }
 
+unsigned long appended_update(struct rdev *dev, struct zone* z)
+{
+        struct zone* nz;
+        
+        if (z->state == ZONE_FULL) {
+                nz = get_open_zone(dev);
+                if (!nz) {
+                        nz = get_empty_zone(dev);
+                        if (nz) {
+                                nz->state = ZONE_OPEN;     
+                        } else
+                                return 1;
+                }
+        }
+}
 
 unsigned long shingled_translation(struct rdev *dev)
 {
@@ -544,9 +569,13 @@ unsigned long shingled_translation(struct rdev *dev)
                 zone_num = dev->mt[logical_page] / dev->nr_pages;
                 pr_debug_z("read_modify_write, zone_num: %u\n", zone_num);
                 z = &dev->zones[zone_num];
-                rmw = read_modify_write(dev, z);
-                
-                return rmw;
+                if (test_bit(R_Appended, &dev->flags)) {
+                        rmw = appended_update(dev, z);
+                        return rmw;
+                } else {
+                        rmw = read_modify_write(dev, z);
+                        return rmw;
+                }
         }
 
         z = get_open_zone(dev);
@@ -560,7 +589,7 @@ unsigned long shingled_translation(struct rdev *dev)
 
         dev->sector = z->wp; 
         dev->mt[logical_page] = z->wp / PAGE_SIZE;
-        pr_debug_z("[mapping table] logical_page: %lu -> %lu\n", logical_page, z->wp / PAGE_SIZE);
+        pr_debug_z("[dev[%d].mt] logical_page: %lu -> %lu\n", dev->num, logical_page, z->wp / PAGE_SIZE);
         z->wp += PAGE_SIZE;
         z->used_pages++;
 
@@ -576,7 +605,7 @@ unsigned long generic_make_request(struct rdev *dev, int rw)
         // static int platter_num;
         unsigned long rmw = 0;
         // unsigned int *ptr = &(dev->buf_write_ptr);
-        if (!strcmp(dev->disk_type, "smr"))
+        if (!strcmp(dev->disk_type, "smr") && rw == IO_WRITE)
                 rmw = shingled_translation(dev);
 
         // print_mapping_table(dev);
@@ -619,8 +648,11 @@ unsigned long generic_make_request(struct rdev *dev, int rw)
         // }
         if (rmw)
                 return rmw;
-                
-        return rotate_time(dev, sector, dev->heads) + seek_time(dev, sector, dev->heads);
+        
+        rmw += seek_time(dev, sector, dev->heads);
+        rmw += rotate_time(dev, sector, dev->heads);
+        return rmw;
+        // return seek_time(dev, sector, dev->heads) + rotate_time(dev, sector, dev->heads);
 
         // if (!test_bit(bm_offset, &dev->sb->bitmap[bm_number]) && rw != IO_READ) {
         //         pr_debug("disk miss\n");
@@ -769,9 +801,10 @@ unsigned long handle_stripe(struct stripe_head *sh, struct mddev *mddev, unsigne
 
         rcw = handle_stripe_dirtying(sh, mddev->level, disks);
         print_stripe_head(sh, stripe_num, disks);
-        resp_time += ops_run_io(sh, disks, IO_READ);
+        // resp_time += ops_run_io(sh, disks, IO_READ);
         // schedule_reconstruction(sh, rcw);
         // raid_run_ops(sh);
+        resp_time += RAID_5_CAL_DELAY;
         resp_time += ops_run_io(sh, disks, IO_WRITE);
         return resp_time;
 
@@ -855,6 +888,8 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
 
         struct stripe_head *sh;
         
+        struct rdev *dev;
+
         init_handle_list(mddev);
         srand(time(NULL));
         // for (i = 0; i < mddev->parity_disks + mddev->data_disks; i++)
@@ -889,7 +924,7 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
 
                 // print_handle_list(mddev);
         }
-        
+        resp_time += transfer_time() + controller_time();
         unsigned long stripe_num = 0;
 
         for (i = 0; mddev->handle_list[i]; i++)
@@ -900,6 +935,11 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
 
         // print_handle_list(mddev);
         // sleep(5);
+        for (i = 0; i < mddev->raid_disks; i++) {
+                dev = &mddev->rdev[i];
+                dev->disk_head.sector = (dev->disk_head.sector + dev->heads) % dev->nr_sectors;
+        }
+
         free_handle_list(mddev);
         // sleep(15);
         return resp_time;
