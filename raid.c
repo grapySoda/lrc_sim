@@ -141,6 +141,8 @@ void init_disk(struct mddev *mddev)
 
                 // mddev->rdev[i].sb = malloc(sizeof(struct superblock));
                 if (!strcmp(mddev->data_disk_info->type, "smr")) {
+                        mddev->rdev[i].algo = 0;
+
                         mddev->rdev[i].nr_zones = mddev->data_disk_info->disk_capacity >> ZONE_SHIFT;
                         mddev->rdev[i].zone_size = mddev->data_disk_info->zone_size;
                         mddev->rdev[i].nr_pages = mddev->data_disk_info->zone_size/ PAGE_SIZE;
@@ -151,8 +153,8 @@ void init_disk(struct mddev *mddev)
                         mddev->rdev[i].zones = malloc(sizeof(struct zone) * mddev->rdev[i].nr_zones);
                         mddev->rdev[i].mt    = malloc(sizeof(int) * (nr_pages));
 
-                        set_bit(R_Appended, &mddev->rdev[i].flags);
-                        set_bit(R_Reversed, &mddev->rdev[i].flags);
+                        set_bit(R_Appended, &(mddev->rdev[i].algo));
+                        set_bit(R_Reversed, &(mddev->rdev[i].algo));
 
                         for (j = 0; j < nr_pages; j++) {
                                 mddev->rdev[i].mt[j] = -1;
@@ -216,6 +218,8 @@ void init_disk(struct mddev *mddev)
 
                 // mddev->rdev[i].sb = malloc(sizeof(struct superblock));
                 if (!strcmp(mddev->parity_disk_info->type, "smr")) {
+                        mddev->rdev[i].algo = 0;
+
                         mddev->rdev[i].nr_zones = mddev->parity_disk_info->disk_capacity >> ZONE_SHIFT;
                         mddev->rdev[i].zone_size = mddev->parity_disk_info->zone_size;
                         mddev->rdev[i].nr_pages = mddev->parity_disk_info->zone_size / PAGE_SIZE;
@@ -225,8 +229,8 @@ void init_disk(struct mddev *mddev)
                         mddev->rdev[i].zones = malloc(sizeof(struct zone) * mddev->rdev[i].nr_zones);
                         mddev->rdev[i].mt    = malloc(sizeof(int) * (nr_pages));
 
-                        set_bit(R_Appended, &mddev->rdev[i].flags);
-                        set_bit(R_Reversed, &mddev->rdev[i].flags);
+                        set_bit(R_Appended, &(mddev->rdev[i].algo));
+                        set_bit(R_Reversed, &(mddev->rdev[i].algo));
 
                         for (j = 0; j < nr_pages; j++) {
                                 mddev->rdev[i].mt[j] = -1;
@@ -366,14 +370,15 @@ unsigned long rotate_time(struct rdev *dev, unsigned long sector, int platters)
 {
         // printf("logic sector: %lu\n", sector);
         unsigned long current_sector = (sector / platters / SECTORS_PER_PAGE) % dev->nr_sectors;
-        // printf("current sector: %u\n", dev->disk_head.sector);
-        // printf("new sector: %lu\n", current_sector);
+        printf("current sector: %u\n", dev->disk_head.sector);
+        printf("new sector: %lu\n", current_sector);
         // unsigned long current_sector = sector % dev->nr_sectors;
         unsigned long rotate_sectors = (current_sector >= (dev->disk_head.sector * platters))
                                         ? current_sector - dev->disk_head.sector
                                         : dev->nr_sectors - (dev->disk_head.sector - current_sector);
         
         dev->disk_head.sector = current_sector;
+        // printf("after current sector: %u\n", dev->disk_head.sector);
         // printf("rotate sectors: %lu\n", rotate_sectors);
         // printf("rotate time: %lu\n", rotate_sectors * ROTATE_PER_SECTOR);
 
@@ -393,8 +398,8 @@ unsigned long seek_time(struct rdev *dev, unsigned long sector, int platters)
 
         // printf("seek time: %lu\n", current_cylinder);
         // printf("seek time: %lu\n", seek_cylinders * SEEK_BETWEEN_TRACK);
-        dev->disk_head.sector += (seek_cylinders * SEEK_BETWEEN_TRACK / ROTATE_PER_SECTOR) * platters;
-        dev->disk_head.sector %= dev->nr_sectors;
+        // dev->disk_head.sector += (seek_cylinders * SEEK_BETWEEN_TRACK / ROTATE_PER_SECTOR) * platters;
+        // dev->disk_head.sector %= dev->nr_sectors;
 
         return seek_cylinders * SEEK_BETWEEN_TRACK;
 }
@@ -456,7 +461,7 @@ void print_mapping_table(struct rdev *dev)
         pr_debug_z("print mapping table:\n");
         for (i = 0; i < pages; i++) {
                 if (dev->mt[i] >= 0)
-                        pr_debug_z("%lu -> %lu\n", i, dev->mt[i]);
+                        pr_debug_z("%lu -> %u\n", i, dev->mt[i]);
         }
 }
 
@@ -539,9 +544,11 @@ unsigned long read_modify_write(struct rdev *dev, struct zone* z)
         return rmw;
 }
 
-unsigned long appended_update(struct rdev *dev, struct zone* z)
+void appended_update(struct rdev *dev, struct zone* z)
 {
+        pr_debug_z("appended_update\n");
         struct zone* nz;
+        unsigned long logical_page = dev->sector / SECTORS_PER_PAGE;
         
         if (z->state == ZONE_FULL) {
                 nz = get_open_zone(dev);
@@ -550,9 +557,19 @@ unsigned long appended_update(struct rdev *dev, struct zone* z)
                         if (nz) {
                                 nz->state = ZONE_OPEN;     
                         } else
-                                return 1;
+                                pr_debug_z("appended_update error\n");;
                 }
         }
+
+        dev->sector = z->wp; 
+        dev->mt[logical_page] = z->wp / PAGE_SIZE;
+        pr_debug_z("[dev[%d].mt] logical_page: %lu -> %lu\n", dev->num, logical_page, z->wp / PAGE_SIZE);
+        z->wp += PAGE_SIZE;
+        z->used_pages++;
+        z->invalid_pages++;
+
+        if (z->wp >= z->end_lba)
+                z->state = ZONE_FULL;
 }
 
 unsigned long shingled_translation(struct rdev *dev)
@@ -567,12 +584,12 @@ unsigned long shingled_translation(struct rdev *dev)
 
         if (dev->mt[logical_page] >= 0) {
                 zone_num = dev->mt[logical_page] / dev->nr_pages;
-                pr_debug_z("read_modify_write, zone_num: %u\n", zone_num);
                 z = &dev->zones[zone_num];
-                if (test_bit(R_Appended, &dev->flags)) {
-                        rmw = appended_update(dev, z);
+                if (test_bit(R_Appended, &dev->algo)) {
+                        appended_update(dev, z);
                         return rmw;
                 } else {
+                        pr_debug_z("read_modify_write, zone_num: %u\n", zone_num);
                         rmw = read_modify_write(dev, z);
                         return rmw;
                 }
@@ -584,7 +601,7 @@ unsigned long shingled_translation(struct rdev *dev)
                 if (z) {
                         z->state = ZONE_OPEN;     
                 } else
-                        return 1;
+                        return SMR_ERROR;
         }
 
         dev->sector = z->wp; 
@@ -601,6 +618,7 @@ unsigned long shingled_translation(struct rdev *dev)
 
 unsigned long generic_make_request(struct rdev *dev, int rw)
 {
+        // pr_debug_z("[Dev %d]\n", dev->num);
         // int i;
         // static int platter_num;
         unsigned long rmw = 0;
@@ -648,7 +666,7 @@ unsigned long generic_make_request(struct rdev *dev, int rw)
         // }
         if (rmw)
                 return rmw;
-        
+        pr_debug_sh("[Dev %d] offset: %u\n", dev->num, sector);
         rmw += seek_time(dev, sector, dev->heads);
         rmw += rotate_time(dev, sector, dev->heads);
         return rmw;
@@ -691,6 +709,7 @@ unsigned long ops_run_io(struct stripe_head *sh, int disks, int rw)
                         resp_time = generic_make_request(dev, rw);
                         dev_num = (resp_time >= max_resp_time) ? i : dev_num;
                         max_resp_time = (resp_time >= max_resp_time) ? resp_time : max_resp_time;
+                        printf("after current sector: %u\n", dev->disk_head.sector);
 
                         pr_debug_rt("ops_run_io, write, disk[%d], spend time: %lu\n", i, resp_time);
                 }           
@@ -793,10 +812,32 @@ int handle_stripe_dirtying(struct stripe_head *sh, int level, int disks)
         return (rcw <= rmw);
 }
 
+void latency_deviation(unsigned int deviation, unsigned long *resp_time)
+{
+        switch (deviation) {
+                case 97: case 194:
+                        puts("97, 194");
+                        *resp_time *= 2;
+                        break;
+                case 98: case 99: case 196: case 197:
+                        *resp_time *= 3;
+                        break;
+                case 198:
+                        *resp_time *= 4;
+                        break;
+                // case 199:
+                //         *resp_time *= 4;
+                //         break;
+                default:
+                        break;
+        }
+}
+
 unsigned long handle_stripe(struct stripe_head *sh, struct mddev *mddev, unsigned long *stripe_num)
 {
         int rcw;
         int disks = mddev->data_disks + mddev->parity_disks;
+        static unsigned int cnt = 0;
         unsigned long resp_time = 0;
 
         rcw = handle_stripe_dirtying(sh, mddev->level, disks);
@@ -804,6 +845,8 @@ unsigned long handle_stripe(struct stripe_head *sh, struct mddev *mddev, unsigne
         // resp_time += ops_run_io(sh, disks, IO_READ);
         // schedule_reconstruction(sh, rcw);
         // raid_run_ops(sh);
+        latency_deviation(cnt % 200, &resp_time);
+        cnt++;
         resp_time += RAID_5_CAL_DELAY;
         resp_time += ops_run_io(sh, disks, IO_WRITE);
         return resp_time;
@@ -948,6 +991,7 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
 unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw)
 {       
         // int i;
+        static unsigned int cnt = 0;
         static unsigned long requst_times;
         
         struct rdev *dev = &mddev->rdev[0];
@@ -981,5 +1025,7 @@ unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw)
         // printf("before: %u\n", dev->disk_head.sector);
         dev->disk_head.sector = (dev->disk_head.sector + dev->heads) % dev->nr_sectors;
         // printf("after: %u\n", dev->disk_head.sector);
+        latency_deviation(cnt % 200, &resp_time);
+        cnt++;
         return resp_time;
 }

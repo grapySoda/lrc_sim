@@ -29,10 +29,11 @@
 #define ROTATE_PER_SECTOR	130000		/* 130 us */
 // #define ROTATE_PER_SECTOR	39150		/* 60  us */
 #define TRANSFER_TIME		39062		/* 39  us */
+// #define SEEK_BETWEEN_TRACK	8		/* 8   ns */
 #define SEEK_BETWEEN_TRACK	8		/* 8   ns */
-#define CONTROLLER_TIME		1000000		/* 1 ms */
+#define CONTROLLER_TIME		1000000		/* 2.5 ms */
 
-#define RAID_5_CAL_DELAY	2500000		/* 1 ms */
+#define RAID_5_CAL_DELAY	2500000		/* 2.5 ms */
 
 /* delay time is based on micro-second */
 // #define BUF_READ_TIME		42000
@@ -57,6 +58,8 @@
 #define ZONE_EMPTY		0
 #define ZONE_OPEN		1
 #define ZONE_FULL		2
+
+#define SMR_ERROR		1
 
 // typedef int (*smr_translate_fn) (struct dm_target *target,
 // 			  unsigned int argc, char **argv);
@@ -232,6 +235,7 @@ struct rdev {
 
 	struct zone		*zones;
 	int			*mt;		/* mapping table */
+	unsigned long 		algo;
 };
 
 // struct shdev {

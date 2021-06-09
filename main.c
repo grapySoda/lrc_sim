@@ -41,11 +41,11 @@ void raid_ctr_init(struct mddev *mddev)
 
         mddev->data_disks = 2;
         mddev->level = 5;
-        mddev->parity_disks = 1;
+        mddev->parity_disks = 2;
         mddev->chunk_sectors = CHUNK_SECTORS;
 
         // mddev->data_disk_info = &disk_info[0];
-        mddev->data_disk_info = &disk_info[1];
+        mddev->data_disk_info = &disk_info[0];
         mddev->parity_disk_info = &disk_info[0];
 
         // mddev->data_disk_type = data_disk_type;

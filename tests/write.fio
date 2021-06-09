@@ -1,5 +1,5 @@
 [global]
-#filename=/dev/sdc
+filename=/dev/md6
 #filename=/dev/md5
 #rw=write
 #bs=4k
@@ -8,7 +8,7 @@
 read_iolog=write.trace
 
 direct=1
-ioengine=libaio
+ioengine=sync
 log_offset=1
 #replay_no_stall=1
 

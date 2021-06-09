@@ -87,13 +87,29 @@ fio version 2 iolog
 2689, 523102153, 1, 104857600, 0
 3500, 810654323, 1, 104857600, 858993459200
 
+
+ccs@ccs:~/test/lrc_sim/paper_result/raid6/seq_write$ cp ../../../tests/rand-write_lat.csv ./
+ccs@ccs:~/test/lrc_sim/paper_result/raid6/seq_write$ cp ../../../tests/sim-rand-write_lat.csv ./
+ccs@ccs:~/test/lrc_sim/paper_result/raid6/seq_write$ cp ../../../tests/CDF.png ./
+ccs@ccs:~/test/lrc_sim/paper_result/raid6/seq_write$ cp ../../../tests/Latency.png ./
+ccs@ccs:~/test/lrc_sim/paper_result/raid6/seq_write$
+
+
 /* Create */
 sudo mdadm -Cv /dev/md5 -l 5 -n 2 -x 1 /dev/sdb /dev/sdc /dev/sdd
 sudo mdadm -D /dev/md5
+
+sudo mdadm -Cv /dev/md6 -l 6 -n 4 /dev/sdb /dev/sdd /dev/sde /dev/sdf
+sudo mdadm -D /dev/md6
 
 /* Delete */
 sed -i '$d' /etc/fstab
 sudo mdadm -S /dev/md5
 sudo mdadm --misc --zero-superblock /dev/sd[b-d]
+
+sed -i '$d' /etc/fstab
+sudo mdadm -S /dev/md6
+sudo mdadm --misc --zero-superblock /dev/sdb
+sudo mdadm --misc --zero-superblock /dev/sd[d-f]
 
 git push -u origin main

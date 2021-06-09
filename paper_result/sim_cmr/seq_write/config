@@ -1,0 +1,9 @@
+offset = 0                      
+size = 10*1024*1024#*256
+step = 4*1024#*256
+# nr_ops = 2560
+nr_ops = size / step
+offsets = range(offset, offset + size, step)
+
+[Mesured]   Latency mean: 8.35 (ms)
+[Simulated] Latency mean: 9.6 (ms)

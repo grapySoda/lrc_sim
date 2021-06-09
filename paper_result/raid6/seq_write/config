@@ -1,0 +1,13 @@
+# offset = 536870912000
+# offset = 912680550400
+offset = 0
+size = 10*1024*1024
+# size = 912680550400
+step = 4*1024
+nr_ops = 2560
+# nr_ops = size / step
+offsets = range(offset, offset + size, step)
+random.shuffle(offsets)
+offsets = offsets[:nr_ops]
+
+[Mesured]   Latency mean: 945.27 (ms)

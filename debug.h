@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 // #define DEBUG
-// #define DEBUG_SH
+#define DEBUG_SH
 // #define DEBUG_RT
 #define DEBUG_Z
 
