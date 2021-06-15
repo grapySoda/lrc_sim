@@ -5,7 +5,7 @@
 
 // #define DEBUG
 #define DEBUG_SH
-// #define DEBUG_RT
+#define DEBUG_RT
 #define DEBUG_Z
 
 #ifdef BUG

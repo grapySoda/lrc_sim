@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.pyplot import MultipleLocator
 
 def plot_data2(data):
+        # x_major_locator=MultipleLocator(5)
+        # y_major_locator=MultipleLocator(0.005)
         plt.figure(3)
         # lower_bound = 0
         # upper_bound = 100
@@ -17,9 +19,9 @@ def plot_data2(data):
         print(y)
         # xmin = 0
         # xmax = 300
-        # ymin = 3.4
-        # ymax = 3.6
-        # axes = plt.gca()
+        # ymin = 0
+        # ymax = 50
+        axes = plt.gca()
         # axes.xaxis.set_major_locator(x_major_locator)
         # axes.yaxis.set_major_locator(y_major_locator)
         # axes.set_xlim([xmin,xmax])
@@ -38,12 +40,12 @@ def plot_cdf(data, data2):
         y_major_locator=MultipleLocator(0.005)
         plt.figure(2)
 
-        xmin = 0
-        xmax = 60
-        ymin = 0.95
-        ymax = 1.05
+        # xmin = 0
+        # xmax = 56.75
+        # ymin = 0.85
+        # ymax = 1.05
 
-        # axes = plt.gca()
+        axes = plt.gca()
         # axes.xaxis.set_major_locator(x_major_locator)
         # axes.yaxis.set_major_locator(y_major_locator)
 
@@ -66,7 +68,7 @@ def plot_cdf(data, data2):
                 x2 = np.sort(data2) / 1000000
                 y2 = 1. * np.arange(len(data2)) / (len(data2) - 1)
                 plots = plt.plot(x, y, 'r-', x2, y2, 'g--')
-                plt.legend(plots, ('Mesured', 'Simulated'), loc='best', framealpha=0.5, prop={'size': 'large', 'family': 'monospace'})
+                plt.legend(plots, ('Measured', 'Simulated'), loc='best', framealpha=0.5, prop={'size': 'large', 'family': 'monospace'})
 
         
         plt.savefig("CDF")
@@ -82,11 +84,12 @@ def mean_nor(data):
                 nor.append((data[i] - min) / (max - min))
 
         return nor
-
+# data_df = pd.read_csv('/home/ccs/test/lrc_sim/paper_result/sim_cmr/rand_write/rand-write_lat.csv')
 data_df = pd.read_csv('rand-write_lat.csv')
 data_np = data_df.to_numpy()
 data_np_t = data_np.T
 
+# data2_df = pd.read_csv('/home/ccs/test/lrc_sim/paper_result/sim_cmr/rand_write/sim-rand-write_lat.csv')
 data2_df = pd.read_csv('sim-rand-write_lat.csv')
 data2_np = data2_df.to_numpy()
 data2_np_t = data2_np.T
@@ -216,13 +219,13 @@ elif (case == 2):
         
         xmin = 0
         xmax = 300
-        ymin = 0.95
-        ymax = 1.05
+        ymin = 0
+        ymax = 50
         axes = plt.gca()
         # axes.xaxis.set_major_locator(x_major_locator)
         # axes.yaxis.set_major_locator(y_major_locator)
         # axes.set_xlim([xmin,xmax])
-        # axes.set_ylim([ymin,ymax])
+        axes.set_ylim([ymin,ymax])
 
         plt.figure(1)
         plt.grid()
@@ -235,8 +238,41 @@ elif (case == 2):
         # plt.show()
         aaa=[]
         plot_cdf(lat_np, lat2_np)
+        # plot_cdf(lat2_np, aaa)
         plot_data2(lat2_np)
         # plot_cdf(lat_np, aaa)
+# elif (case == 3):
+#         lower_bound = 0
+#         upper_bound = 100
+#         # lower_bound = 0
+#         # upper_bound = len(lat_nor)
+
+#         x = [int(i) for i in range(0, len(lat_nor))]
+#         y = lat2_np / 1000000
+        
+#         xmin = 0
+#         xmax = 300
+#         ymin = 0
+#         ymax = 50
+#         axes = plt.gca()
+#         # axes.xaxis.set_major_locator(x_major_locator)
+#         # axes.yaxis.set_major_locator(y_major_locator)
+#         # axes.set_xlim([xmin,xmax])
+#         axes.set_ylim([ymin,ymax])
+
+#         plt.figure(1)
+#         plt.grid()
+#         plt.xlabel("Requests")
+#         plt.ylabel("Latency (ms)")
+#         # plt.title("Latency")
+#         plots = plt.plot(x, y, linewidth=0.5)
+#         # plt.legend(plots, ('Latency'), loc='best', framealpha=0.5, prop={'size': 'large', 'family': 'monospace'})
+#         plt.savefig("Latency")
+#         # plt.show()
+#         aaa=[]
+#         plot_cdf(lat2_np, aaa)
+#         # plot_data2(lat2_np)
+#         # plot_cdf(lat_np, aaa)
 else:
         print("ERROR")
 print(round(np.min(lat_np), 2))

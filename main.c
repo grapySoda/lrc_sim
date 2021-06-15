@@ -39,9 +39,9 @@ void raid_ctr_init(struct mddev *mddev)
         // char data_disk_type[] = "cmr";
         // char parity_disk_type[] = "cmr";
 
-        mddev->data_disks = 2;
-        mddev->level = 5;
-        mddev->parity_disks = 2;
+        mddev->data_disks = 6;
+        mddev->level = 6;
+        mddev->parity_disks = 4;
         mddev->chunk_sectors = CHUNK_SECTORS;
 
         // mddev->data_disk_info = &disk_info[0];

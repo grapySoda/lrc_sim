@@ -26,7 +26,7 @@
 
 /* base on ns */
 #define ROTATE_PER_TRACK	8333330	 	/* 8.3 ms */
-#define ROTATE_PER_SECTOR	130000		/* 130 us */
+#define ROTATE_PER_SECTOR	120000		/* 130 us */
 // #define ROTATE_PER_SECTOR	39150		/* 60  us */
 #define TRANSFER_TIME		39062		/* 39  us */
 // #define SEEK_BETWEEN_TRACK	8		/* 8   ns */
@@ -261,7 +261,7 @@ struct stripe_head {
 	unsigned long		state;		/* state flags */
 	int			disks;		/* disks in stripe */
 
-	struct rdev 		*dev;		/* allocated with extra space depending of RAID geometry */
+	struct rdev 		**dev;		/* allocated with extra space depending of RAID geometry */
 };
 
 struct mddev {
