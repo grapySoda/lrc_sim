@@ -1,4 +1,5 @@
 #!/bin/sh
+./mktrace.py /dev/md6
 
 make clean
 make

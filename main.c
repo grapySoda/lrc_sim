@@ -4,11 +4,19 @@
 
 #include "raid.h"
 
+#define ONLY_SIMULATE
+
 // #define BUF_SIZE        100
 
 #define DISKS_INFO              "disks.info"
 #define RAID_CONFIG             "raid.config"
+
+#ifdef ONLY_SIMULATE
+#define TRACE_FILE              "/home/ccs/test/lrc_sim/write.trace"
+#else
 #define TRACE_FILE              "/home/ccs/test/lrc_sim/tests/rand-write_lat.1.log"
+#endif
+
 #define OUTPUT_LAT_LOG          "/home/ccs/test/lrc_sim/tests/sim-rand-write_lat.1.log"
 // #define TRACE_FILE      "randwrite.trace"
 
@@ -40,12 +48,12 @@ void raid_ctr_init(struct mddev *mddev)
         // char parity_disk_type[] = "cmr";
 
         mddev->data_disks = 6;
-        mddev->level = 6;
+        mddev->level = 7;
         mddev->parity_disks = 4;
         mddev->chunk_sectors = CHUNK_SECTORS;
 
         // mddev->data_disk_info = &disk_info[0];
-        mddev->data_disk_info = &disk_info[0];
+        mddev->data_disk_info = &disk_info[1];
         mddev->parity_disk_info = &disk_info[0];
 
         // mddev->data_disk_type = data_disk_type;
@@ -57,7 +65,7 @@ void raid_ctr_init(struct mddev *mddev)
         // init_handle_list(mddev);
 
         mddev->flags = 0;
-
+        mddev->base_sector = 1677459456;         /* (800(GB) - 128(MB)) / 512 (B) */
         // switch(mddev->level) {
         //         case 4:
         //                 mddev->chunk_sectors = CHUNK_SECTORS * mddev->data_disks;
@@ -128,6 +136,9 @@ int main(void)
 
                 i++;
         }
+
+        print_dev_garbage(mddev);
+
         fclose(fp_trace);
         fclose(fp_output_log);
         free(io);

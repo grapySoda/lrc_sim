@@ -116,6 +116,13 @@ void init_disk(struct mddev *mddev)
         unsigned long nr_parity_buf      = mddev->parity_disk_info->buffer_size >> PAGE_SHIFT;
 
         mddev->rdev = malloc(sizeof(struct rdev) * raid_disks);
+        mddev->temp_list = malloc(sizeof(struct temp_list) * TEMP_LIST_SIZE);
+        mddev->mt = malloc(sizeof(struct ru_mt) * RU_MT_SIZE);
+
+        for (i = 0; i < TEMP_LIST_SIZE; i++) {
+                mddev->temp_list[i].used = -1;
+                mddev->temp_list[i].first = 1;
+        }
         
         /* init data_disk's bitmap */
         for (i = 0; i < data_disks; i++) {
@@ -883,13 +890,16 @@ unsigned long raid_compute_sector(struct mddev *mddev, unsigned long r_sector,
 
         int sectors_per_chunk = mddev->chunk_sectors;
         int data_disks = mddev->data_disks;
-        int raid_disks = data_disks + mddev->parity_disks;
+        int parity_disks = mddev->parity_disks;
+        int raid_disks = data_disks + parity_disks;
 
         chunk_offset = sector_div(r_sector, sectors_per_chunk);
         *stripe_offset = chunk_offset;
 	chunk_number = r_sector;
 
         stripe = chunk_number;
+        if (test_bit(R_Reversed, &mddev->flags))
+                *dd_idx = data_disks + sector_div(stripe, parity_disks);
 	*dd_idx = sector_div(stripe, data_disks);
 	stripe2 = stripe;
         *stripe_number = stripe;
@@ -914,6 +924,12 @@ unsigned long raid_compute_sector(struct mddev *mddev, unsigned long r_sector,
 				(*dd_idx) += 2; /* D D P Q D */
 			break;
                 case 7:
+                        if (test_bit(R_Reversed, &mddev->flags)) {
+                                lpd1_idx = 0;
+                                lpd2_idx = 1;
+                                gpd1_idx = 2;
+                                gpd2_idx = 3;
+                        }
                         lpd1_idx = data_disks;
                         lpd2_idx = data_disks + 1;
                         gpd1_idx = data_disks + 2;
@@ -939,10 +955,103 @@ unsigned long raid_compute_sector(struct mddev *mddev, unsigned long r_sector,
 //                 printf("sh->dev[%d] = %lu\n", i, sh->dev[i].sector);
 // }
 
+void print_dev_garbage(struct mddev *mddev)
+{
+        struct rdev *dev;
+        
+        int i;
+        unsigned int j;
+
+        unsigned long used;
+        unsigned long total_used = 0;
+
+        unsigned long garbages;
+        unsigned long total_garbages = 0;
+
+        int raid_disks = mddev->data_disks + mddev->parity_disks;
+
+        for (i = 0; i < raid_disks; i++) {
+                garbages = 0;
+                used = 0;
+                dev = &mddev->rdev[i];
+                
+                if (!strcmp(dev->disk_type, "smr")) {
+                        for (j = 0; j < dev->nr_zones; j++) {
+                                garbages += dev->zones[j].invalid_pages;
+                                used += dev->zones[j].used_pages;
+                        }
+                        total_garbages += garbages;
+                        total_used += used;
+                        printf("[Dev %d] Used: %lu, Garbages: %lu\n", i, used, garbages);
+                }
+        }
+        printf("Total Used: %lu, Total Garbages: %lu\n", total_used, total_garbages);
+}
+
+struct temp_list* search_temp_list(struct mddev *mddev, unsigned long sector)
+{
+        int i;
+        for (i = 0; i < TEMP_LIST_SIZE; i++) {
+                if (mddev->temp_list[i].sector == sector &&
+                    mddev->temp_list[i].used >= 0) {
+                        // puts("\n\n\n\n\n\n\nFind Temp List!!!\n\n\n\n\n\n\n");
+                        return &mddev->temp_list[i];
+                }
+        }
+
+        return NULL;
+}
+
+void add_temp_list(struct mddev *mddev, unsigned long sector)
+{
+        int i;
+        for (i = 0; i < TEMP_LIST_SIZE; i++) {
+                if (mddev->temp_list[i].used < 0) {
+                        mddev->temp_list[i].used = 1;
+                        mddev->temp_list[i].sector = sector;
+                        mddev->temp_list[i].temp = BASE_TEMP;
+                        break;
+                }  
+        }
+}
+
+void clean_temp_list(struct mddev *mddev)
+{
+        int i;
+        for (i = 0; i < TEMP_LIST_SIZE; i++) {
+                if (mddev->temp_list[i].temp <= 0) {
+                        mddev->temp_list[i].first = 1;
+                        mddev->temp_list[i].used = -1;
+                }
+        }
+}
+
+void decrease_temp_list(struct mddev *mddev, unsigned long resp_time)
+{
+        int i;
+        for (i = 0; i < TEMP_LIST_SIZE; i++)
+                if (mddev->temp_list[i].used >= 0)
+                        mddev->temp_list[i].temp -= resp_time;
+}
+
+void check_temp_list(struct mddev *mddev)
+{
+        int i;
+        for (i = 0; i < TEMP_LIST_SIZE; i++) {
+                if (mddev->temp_list[i].temp >= TEMP_THREASHOLD &&
+                    mddev->temp_list[i].used >= 0) {
+                        set_bit(R_Reversed, &mddev->flags);
+                        return;
+                }
+        }
+        clear_bit(R_Reversed, &mddev->flags);
+}
+
 unsigned long make_request(struct mddev *mddev, struct io *io)
 {       
         int i, dd_idx;
         static unsigned long requst_times;
+        static unsigned long last_resp_time;
         
         unsigned long resp_time = 0;
 
@@ -953,14 +1062,47 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
         unsigned long last_sector = logical_sector + io->length / SECTOR_SIZE;
         unsigned long new_sector = 0;
 
+        int raid_disks = mddev->data_disks + mddev->parity_disks;
+
         struct stripe_head *sh;
-        
+        struct temp_list *temp_node;
+
         struct rdev *dev;
 
         init_handle_list(mddev);
         srand(time(NULL));
         // for (i = 0; i < mddev->parity_disks + mddev->data_disks; i++)
         //         pr_debug_sh("disk[%d]: %d\n", i, *(mddev->rdev[i].buf_ptr));
+
+        /* Init reversed update */
+
+#ifdef REVERSED
+        decrease_temp_list(mddev, last_resp_time);
+        clean_temp_list(mddev);
+        if (io->length >= BIG_FILE_SIZE) {             /* io >= 2MB */
+                temp_node = search_temp_list(mddev, logical_sector);
+                if (temp_node) {
+                        temp_node->temp += BASE_TEMP;
+                        if (temp_node->temp >= TEMP_THREASHOLD) {
+                                set_bit(R_Reversed, &mddev->flags);
+                                // puts("\n\n\n\n\n\n\nReversed Update!!!\n\n\n\n\n\n\n");
+                                if (temp_node->first) {
+                                        temp_node->start_sector = mddev->base_sector;
+                                        mddev->base_sector += io->length / SECTOR_SIZE;
+                                        temp_node->end_sector = mddev->base_sector;
+                                        mddev->base_sector++;
+                                        temp_node->first = 0;
+                                }
+                                logical_sector = temp_node->start_sector;
+                                last_sector = temp_node->end_sector;
+                        }
+                } else {
+                        // puts("\n\n\n\n\n\n\nadd_temp_list!!!\n\n\n\n\n\n\n");
+                        add_temp_list(mddev, logical_sector);
+                }
+        }
+        // check_temp_list(mddev);
+#endif
 
         for (; logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
                 new_sector = raid_compute_sector(mddev, logical_sector, &dd_idx, NULL,
@@ -1002,6 +1144,7 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
 
                 // print_handle_list(mddev);
         }
+
         resp_time += transfer_time() + controller_time();
         unsigned long stripe_num = 0;
 
@@ -1014,15 +1157,24 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
         printf("[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n\n",
                 requst_times++, io->logical_sector, io->length, resp_time);
 
+        // print_dev_garbage(mddev);
         // print_handle_list(mddev);
         // sleep(5);
-        for (i = 0; i < mddev->raid_disks; i++) {
-                dev = &mddev->rdev[i];
-                dev->disk_head.sector = (dev->disk_head.sector + dev->heads) % dev->nr_sectors;
-        }
+        // printf("raid_disks:%u\n", mddev->raid_disks);
+        // for (i = 0; i < raid_disks; i++) {
+        //         dev = &mddev->rdev[i];
+        //         dev->disk_head.sector = (dev->disk_head.sector + dev->heads) % dev->nr_sectors;
+        //         printf("disk_type:%s\n", dev->disk_type);
+        //         if (!strcmp(dev->disk_type, "smr"))
+        //                 puts("SMR");
+                        
+
+        // }
 
         free_handle_list(mddev);
         // sleep(15);
+        clear_bit(R_Reversed, &mddev->flags);
+        last_resp_time = resp_time / 1000000;
         return resp_time;
 }
 

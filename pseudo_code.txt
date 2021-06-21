@@ -2,3 +2,20 @@ if (request == update) then
         do read-modify-write operation;
 
 find the zone state which is open;
+
+search_temp_list()
+
+if (test_bit(Reversed_update, &mddev->flags)) {
+        ;
+} else {
+        if (request_size > 2MB) {
+                node = search_temp_list(mddev, dev_num, sector)
+                if (node) {
+                        if (node_temp > temp_threashold) {
+                                set_bit(Reversed_update, &mddev->flags);
+                        }
+                } else {
+                        add_temp_list(mddev, dev_num, sector);
+                }
+        }
+}

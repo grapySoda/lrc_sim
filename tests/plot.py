@@ -74,6 +74,22 @@ def plot_cdf(data, data2):
         plt.savefig("CDF")
         # plt.show()
 
+def plot_bar():
+        plt.figure(4)
+        width=0.25
+        x1=[2015, 2016, 2017, 2018, 2019]
+        y1=(4.33, 5.67, 3.78, 5.62, 6.7)
+        x2=[p + width for p in x1]
+        y2=(3.01, 1.28, 6.1, 7.1, 7.22)
+        plt.bar(x1, y1, label='Normal', width=0.25)
+        plt.bar(x2, y2, label='Reversed Update', width=0.25, hatch='/'*3)
+        plt.xticks([p + width/2 for p in x1], x1)
+        plt.legend()
+        plt.title('ETF Dividend Yield')
+        plt.xlabel('Year')
+        plt.ylabel('Dividend yield(NT$)')
+        plt.savefig("bar")
+
 def mean_nor(data):
         nor = []
         max = np.max(data)
@@ -275,5 +291,7 @@ elif (case == 2):
 #         # plot_cdf(lat_np, aaa)
 else:
         print("ERROR")
+
+plot_bar()
 print(round(np.min(lat_np), 2))
 print(round(np.mean(offset_np), 2))

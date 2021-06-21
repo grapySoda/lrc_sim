@@ -4,9 +4,10 @@
 #include <stdio.h>
 
 // #define DEBUG
-#define DEBUG_SH
+// #define DEBUG_SH
 #define DEBUG_RT
 #define DEBUG_Z
+#define REVERSED
 
 #ifdef BUG
 #define bug(M, ...) fprintf(stdout, "[log] " M , ##__VA_ARGS__)

@@ -61,6 +61,14 @@
 
 #define SMR_ERROR		1
 
+#define TEMP_LIST_SIZE		1000
+#define RU_MT_SIZE		32768		/* 128/4 (MB/KB) */
+
+#define TEMP_THREASHOLD		2000
+#define BASE_TEMP		200
+
+#define BIG_FILE_SIZE		2097152
+
 // typedef int (*smr_translate_fn) (struct dm_target *target,
 // 			  unsigned int argc, char **argv);
 // typedef int (*smr_reportzone_fn) (struct dm_target *target,
@@ -264,10 +272,27 @@ struct stripe_head {
 	struct rdev 		**dev;		/* allocated with extra space depending of RAID geometry */
 };
 
+struct ru_mt {
+	unsigned int		dev;
+	unsigned int		ndev;
+	unsigned long		sector;
+	unsigned long		nsector;
+};
+
+struct temp_list {
+	int			used;
+	int			temp;
+	int			first;
+	unsigned long		sector;
+	unsigned long		start_sector;
+	unsigned long		end_sector;
+};
+
 struct mddev {
         // struct disk_info 	cmr;
 	// struct disk_info 	smr;
-
+	struct temp_list	*temp_list;
+	struct ru_mt		*mt;
 	struct stripe_head	*handle_list[HANDLE_LIST_SIZE];
 
 	struct disk_info	*data_disk_info;
@@ -281,7 +306,11 @@ struct mddev {
 	int 			chunk_sectors;
 
 	unsigned long		flags;
+	unsigned long		base_sector;
 
+	unsigned int		mt_ptr;
+	unsigned int		temp_list_ptr;
+	
 	struct rdev		*rdev;
 };
 
@@ -298,5 +327,6 @@ unsigned long test_single_disk(struct mddev *mddev, struct io *io, short rw);
 
 void init_handle_list(struct mddev *mddev);
 void init_disk(struct mddev *mddev);
+void print_dev_garbage(struct mddev *mddev);
 
 #endif
