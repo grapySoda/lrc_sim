@@ -122,6 +122,8 @@ void init_disk(struct mddev *mddev)
         for (i = 0; i < TEMP_LIST_SIZE; i++) {
                 mddev->temp_list[i].used = -1;
                 mddev->temp_list[i].first = 1;
+                mddev->temp_list[i].times = 1;
+                mddev->temp_list[i].duration = 1;
         }
         
         /* init data_disk's bitmap */
@@ -1002,13 +1004,14 @@ struct temp_list* search_temp_list(struct mddev *mddev, unsigned long sector)
         return NULL;
 }
 
-void add_temp_list(struct mddev *mddev, unsigned long sector)
+void add_temp_list(struct mddev *mddev, unsigned long sector, unsigned long total_time)
 {
         int i;
         for (i = 0; i < TEMP_LIST_SIZE; i++) {
                 if (mddev->temp_list[i].used < 0) {
                         mddev->temp_list[i].used = 1;
                         mddev->temp_list[i].sector = sector;
+                        mddev->temp_list[i].last_time = total_time;
                         mddev->temp_list[i].temp = BASE_TEMP;
                         break;
                 }  
@@ -1052,6 +1055,7 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
         int i, dd_idx;
         static unsigned long requst_times;
         static unsigned long last_resp_time;
+        static unsigned long total_time;
         
         unsigned long resp_time = 0;
 
@@ -1061,6 +1065,7 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
         unsigned long logical_sector = io->logical_sector / SECTOR_SIZE;
         unsigned long last_sector = logical_sector + io->length / SECTOR_SIZE;
         unsigned long new_sector = 0;
+        unsigned long duration;
 
         int raid_disks = mddev->data_disks + mddev->parity_disks;
 
@@ -1076,14 +1081,42 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
 
         /* Init reversed update */
 
+        static unsigned long max_duration;
+        static unsigned long min_duration = 52789;
+        static unsigned long total_duration;
+        static unsigned long total_duration_times;
+
 #ifdef REVERSED
-        decrease_temp_list(mddev, last_resp_time);
+        // decrease_temp_list(mddev, last_resp_time);
         clean_temp_list(mddev);
         if (io->length >= BIG_FILE_SIZE) {             /* io >= 2MB */
                 temp_node = search_temp_list(mddev, logical_sector);
                 if (temp_node) {
                         temp_node->temp += BASE_TEMP;
-                        if (temp_node->temp >= TEMP_THREASHOLD) {
+                        duration = total_time - temp_node->last_time;
+                        printf("times: %lu, duration: %lu\n", temp_node->times, duration);
+                        if ((duration / AVG_DURATION) > 0.0) {
+                                temp_node->heat = temp_node->times / (duration / AVG_DURATION);
+                                printf("temp_node->heat: %f\n", temp_node->heat);
+                                printf("(duration / AVG_DURATION): %f\n", (duration / AVG_DURATION));
+                        }
+
+                        if (total_time == 0)
+                                total_time = 1;
+                        temp_node->last_time = total_time;
+                        temp_node->times++;
+
+                        if (duration > max_duration)
+                                max_duration = duration;
+
+                        if (duration < min_duration)
+                                min_duration = duration;
+                        
+                        total_duration += duration;
+                        total_duration_times++;
+
+                        // if (temp_node->temp >= TEMP_THREASHOLD) {
+                        if (temp_node->heat >= 2.0) {
                                 set_bit(R_Reversed, &mddev->flags);
                                 // puts("\n\n\n\n\n\n\nReversed Update!!!\n\n\n\n\n\n\n");
                                 if (temp_node->first) {
@@ -1098,7 +1131,7 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
                         }
                 } else {
                         // puts("\n\n\n\n\n\n\nadd_temp_list!!!\n\n\n\n\n\n\n");
-                        add_temp_list(mddev, logical_sector);
+                        add_temp_list(mddev, logical_sector, total_time);
                 }
         }
         // check_temp_list(mddev);
@@ -1154,6 +1187,9 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
         if (mddev->level > 5)
                 latency_deviation_raid6(requst_times % 100, &resp_time);
 
+        if (mddev->level == 7)
+                resp_time += 2000000;
+
         printf("[Request %lu] Logical Offset: %lu, Write Size: %lu, Response Time: %lu\n\n",
                 requst_times++, io->logical_sector, io->length, resp_time);
 
@@ -1175,6 +1211,9 @@ unsigned long make_request(struct mddev *mddev, struct io *io)
         // sleep(15);
         clear_bit(R_Reversed, &mddev->flags);
         last_resp_time = resp_time / 1000000;
+        total_time += last_resp_time;
+        if (total_duration_times > 0)
+                printf("Max duration: %lu, Min duration: %lu, Avg duration: %lu\n", max_duration, min_duration, (total_duration/total_duration_times));
         return resp_time;
 }
 

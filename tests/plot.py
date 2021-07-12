@@ -253,8 +253,8 @@ elif (case == 2):
         plt.savefig("Latency")
         # plt.show()
         aaa=[]
-        plot_cdf(lat_np, lat2_np)
-        # plot_cdf(lat2_np, aaa)
+        # plot_cdf(lat_np, lat2_np)
+        plot_cdf(lat2_np, aaa)
         plot_data2(lat2_np)
         # plot_cdf(lat_np, aaa)
 # elif (case == 3):

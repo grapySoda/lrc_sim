@@ -67,8 +67,13 @@
 #define TEMP_THREASHOLD		2000
 #define BASE_TEMP		200
 
+// #define BIG_FILE_SIZE		1048576
 #define BIG_FILE_SIZE		2097152
+// #define BIG_FILE_SIZE		3145728
 
+#define AVG_RESP_TIME		10		/* average response time = 10ms */
+
+#define AVG_DURATION		13600.0
 // typedef int (*smr_translate_fn) (struct dm_target *target,
 // 			  unsigned int argc, char **argv);
 // typedef int (*smr_reportzone_fn) (struct dm_target *target,
@@ -282,7 +287,14 @@ struct ru_mt {
 struct temp_list {
 	int			used;
 	int			temp;
+	double 			heat;
 	int			first;
+
+	double			times;
+	unsigned long		duration;
+	unsigned long		last_time;
+	// unsigned long		curr_time;
+
 	unsigned long		sector;
 	unsigned long		start_sector;
 	unsigned long		end_sector;
